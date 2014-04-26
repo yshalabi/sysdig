@@ -624,6 +624,40 @@ static inline u32 clone_flags_to_scap(unsigned long flags)
 	return res;
 }
 
+/*
+ * undefined in the kernel, so copy it here, ugly
+ */
+struct file *get_mm_exe_file(struct mm_struct *mm)
+{
+	struct file *exe_file;
+
+	/* We need mmap_sem to protect against races with removal of exe_file */
+	down_read(&mm->mmap_sem);
+	exe_file = mm->exe_file;
+	if (exe_file)
+		get_file(exe_file);
+	up_read(&mm->mmap_sem);
+	return exe_file;
+}
+
+static const char* get_exepath(char* buf, uint64_t buflen)
+{
+	struct file *exe_file;
+	char *path = NULL;
+
+	if (!current->mm)
+		return path;
+
+	exe_file = get_mm_exe_file(current->mm);
+	if (!exe_file)
+		return path;
+
+	path = d_path(&exe_file->f_path, buf, buflen);
+
+	fput(exe_file);
+	return path;
+}
+
 static int f_proc_startupdate(struct event_filler_arguments *args)
 {
 	unsigned long val;
@@ -632,6 +666,7 @@ static int f_proc_startupdate(struct event_filler_arguments *args)
 	unsigned int args_len = 0;
 	struct mm_struct *mm = current->mm;
 	int64_t retval;
+	const char *exepath;
 	const char *argstr;
 	int ptid;
 	char *spwd;
@@ -771,6 +806,19 @@ static int f_proc_startupdate(struct event_filler_arguments *args)
 		res = val_to_ring(args, egid, 0, false);
 		if (unlikely(res != PPM_SUCCESS))
 			return res;
+	}
+
+	exepath = get_exepath(args->str_storage, STR_STORAGE_SIZE - 1);
+	if (exepath == NULL)
+		exepath = "";
+
+	/*
+	 * exepath
+	 */
+	res = val_to_ring(args, (uint64_t)(long)exepath, 0, false);
+	if (unlikely(res != PPM_SUCCESS))
+	{
+		return res;
 	}
 
 	return add_sentinel(args);
