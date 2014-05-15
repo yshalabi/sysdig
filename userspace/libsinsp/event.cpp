@@ -67,7 +67,7 @@ sinsp_evt::sinsp_evt() :
 	m_params_loaded = false;
 	m_tinfo = NULL;
 #ifdef _DEBUG
-	m_filtered_out = false;
+	m_flt_flag = FF_ACCEPT;
 #endif
 }
 
@@ -78,7 +78,7 @@ sinsp_evt::sinsp_evt(sinsp *inspector) :
 	m_params_loaded = false;
 	m_tinfo = NULL;
 #ifdef _DEBUG
-	m_filtered_out = false;
+	m_flt_flag = FF_ACCEPT;
 #endif
 }
 
@@ -1351,7 +1351,7 @@ void sinsp_evt::get_category(OUT sinsp_evt::category* cat)
 	}
 }
 
-bool sinsp_evt::is_filtered_out()
+sinsp_evt::flt_flag sinsp_evt::get_filter_flag()
 {
-	return m_filtered_out;
+	return m_flt_flag;
 }

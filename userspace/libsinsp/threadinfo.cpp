@@ -254,8 +254,20 @@ void sinsp_threadinfo::init(const scap_threadinfo* pi)
 				newfdi.set_role_server();
 			}
 			break;
-		case SCAP_FD_FIFO:
 		case SCAP_FD_FILE:
+			newfdi.m_name = fdi->info.fname;
+
+			//
+			// If this is a user event fd, mark it with the proper flag
+			//
+			if(newfdi.m_name == USER_EVT_DEVICE_NAME)
+			{
+				newfdi.m_flags |= sinsp_fdinfo_t::FLAGS_IS_USER_EVENT_FD;
+			}
+
+			break;
+
+		case SCAP_FD_FIFO:
 		case SCAP_FD_DIRECTORY:
 		case SCAP_FD_UNSUPPORTED:
 		case SCAP_FD_SIGNALFD:
