@@ -89,3 +89,8 @@ along with sysdig.  If not, see <http://www.gnu.org/licenses/>.
 template<class T> class sinsp_fdinfo;
 typedef sinsp_fdinfo<int> sinsp_fdinfo_t;
 #endif // HAS_ANALYZER
+
+//
+// Name of the device used for user event injection
+//
+#define USER_EVT_DEVICE_NAME "/dev/sysdig-events"

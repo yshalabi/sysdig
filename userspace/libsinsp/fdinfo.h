@@ -178,6 +178,7 @@ private:
 		FLAGS_CLOSE_CANCELED = (1 << 5),
 		// Pipe-specific flags
 		FLAGS_IS_SOCKET_PIPE = (1 << 6),
+		FLAGS_IS_USER_EVENT_FD = (1 << 7),
 	};
 
 	void add_filename(const char* directory, uint32_t directorylen, const char* filename, uint32_t filenamelen);

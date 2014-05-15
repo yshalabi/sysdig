@@ -49,6 +49,7 @@ sinsp_parser::sinsp_parser(sinsp *inspector) :
 	m_tmp_evt(m_inspector),
 	m_fd_listener(NULL)
 {
+	m_fake_userevt = (scap_evt*)m_fake_userevt_storage;
 #if defined(HAS_CAPTURE)
 	m_sysdig_pid = getpid();
 #endif
@@ -70,7 +71,7 @@ void sinsp_parser::process_event(sinsp_evt *evt)
 	//
 	reset(evt);
 
-//
+	//
 	// When debug mode is not enabled, filter out events about sysdig itself
 	//
 #if defined(HAS_CAPTURE)
@@ -108,13 +109,13 @@ void sinsp_parser::process_event(sinsp_evt *evt)
 					evt->m_tinfo->m_lastevent_type = PPM_SC_MAX;
 				}
 
-				evt->m_filtered_out = true;
+				evt->m_flt_flag = sinsp_evt::FF_FILTER_OUT;
 				return;
 			}
 		}
 	}
 
-	evt->m_filtered_out = false;
+	evt->m_flt_flag = sinsp_evt::FF_ACCEPT;
 #endif
 
 	//
@@ -136,6 +137,19 @@ void sinsp_parser::process_event(sinsp_evt *evt)
 	case PPME_SOCKET_SENDTO_E:
 	case PPME_SOCKET_SENDMSG_E:
 		store_event(evt);
+		break;
+	case PPME_SYSCALL_WRITE_E:
+/*
+		evt->m_fdinfo = evt->m_tinfo->get_fd(evt->m_tinfo->m_lastevent_fd);
+		if(evt->m_fdinfo)
+		{
+			if(evt->m_fdinfo->m_flags & sinsp_fdinfo_t::FLAGS_IS_USER_EVENT_FD)
+			{
+				evt->m_flt_flag = sinsp_evt::FF_FILTER_OUT;
+				return;
+			}
+		}
+*/
 		break;
 	case PPME_SYSCALL_READ_X:
 	case PPME_SYSCALL_WRITE_X:
@@ -255,11 +269,12 @@ void sinsp_parser::process_event(sinsp_evt *evt)
 		{
 			if(m_inspector->m_filter->run(evt) == false)
 			{
-				evt->m_filtered_out = true;
+				evt->m_flt_flag = sinsp_evt::FF_FILTER_OUT;
 				return;
 			}
 		}
-		evt->m_filtered_out = false;
+
+		evt->m_flt_flag = sinsp_evt::FF_ACCEPT;
 	}
 #endif
 }
@@ -980,6 +995,14 @@ void sinsp_parser::parse_open_openat_creat_exit(sinsp_evt *evt)
 		sdir.length(),
 		name,
 		namelen);
+	
+	//
+	// If this is a user event fd, mark it with the proper flag
+	//
+	if(fdi.m_name == USER_EVT_DEVICE_NAME)
+	{
+		fdi.m_flags |= sinsp_fdinfo_t::FLAGS_IS_USER_EVENT_FD;
+	}
 
 	//
 	// Add the fd to the table.
@@ -1791,6 +1814,40 @@ void sinsp_parser::swap_ipv4_addresses(sinsp_fdinfo_t* fdinfo)
 	fdinfo->m_sockinfo.m_ipv4info.m_fields.m_dport = tport;
 }
 
+//
+// This function parses a write to /dev/sysdig-events and coverts it into
+// a PPME_USER_* event
+//
+void sinsp_parser::parse_userevt(sinsp_evt *evt)
+{
+	uint16_t newetype = PPME_USER_E;
+
+	m_fake_userevt->ts = evt->m_pevt->ts;
+	m_fake_userevt->tid = evt->m_pevt->tid;
+	m_fake_userevt->len = 0;
+	m_fake_userevt->type = newetype;
+	uint16_t *lens = (uint16_t *)(m_fake_userevt_storage + sizeof(struct ppm_evt_hdr));
+	lens[0] = 8;
+	lens[1] = 4;
+
+	*(uint64_t *)(m_fake_userevt_storage + sizeof(struct ppm_evt_hdr) + 4) = 33;
+	*(m_fake_userevt_storage + sizeof(struct ppm_evt_hdr) + 12) = 'A';
+	*(m_fake_userevt_storage + sizeof(struct ppm_evt_hdr) + 13) = 'B';
+	*(m_fake_userevt_storage + sizeof(struct ppm_evt_hdr) + 14) = 'C';
+	*(m_fake_userevt_storage + sizeof(struct ppm_evt_hdr) + 15) = '\0';
+
+	evt->m_pevt = m_fake_userevt;
+	evt->init();
+
+	if(evt->m_tinfo)
+	{
+		evt->m_tinfo->m_lastevent_fd = -1;
+		evt->m_tinfo->m_lastevent_type = newetype;
+		evt->m_tinfo->m_latency = 0;
+		evt->m_tinfo->m_last_latency_entertime = 0;
+	}
+}
+
 void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 {
 	sinsp_evt_param *parinfo;
@@ -1798,11 +1855,23 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 	int64_t tid = evt->get_tid();
 	sinsp_evt *enter_evt = &m_tmp_evt;
 	ppm_event_flags eflags = evt->get_flags();
+	sinsp_fdinfo_t* fdinfo = evt->m_fdinfo;
 
-	if(!evt->m_fdinfo)
+	if(!fdinfo)
 	{
 		return;
 	}
+
+	//
+	// User events get into the engine as normal writes, but the FD has a flag to
+	// quickly recognize them.
+	//
+/*
+	if(fdinfo->m_flags & sinsp_fdinfo_t::FLAGS_IS_USER_EVENT_FD)
+	{
+		parse_userevt(evt);
+	}
+*/
 
 	//
 	// Extract the return value
@@ -1833,7 +1902,7 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 				tupleparam = 3;
 			}
 
-			if(tupleparam != -1 && (evt->m_fdinfo->m_name.length() == 0 || !evt->m_fdinfo->is_tcp_socket()))
+			if(tupleparam != -1 && (fdinfo->m_name.length() == 0 || !fdinfo->is_tcp_socket()))
 			{
 				//
 				// recvfrom contains tuple info.
@@ -1845,32 +1914,32 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 				{
 					const char *parstr;
 
-					scap_fd_type fdtype = evt->m_fdinfo->m_type;
+					scap_fd_type fdtype = fdinfo->m_type;
 
 					if(fdtype == SCAP_FD_IPV4_SOCK)
 					{
-						if(evt->m_fdinfo->is_role_none())
+						if(fdinfo->is_role_none())
 						{
-								evt->m_fdinfo->set_net_role_by_guessing(m_inspector,
+								fdinfo->set_net_role_by_guessing(m_inspector,
 									evt->m_tinfo,
-									evt->m_fdinfo,
+									fdinfo,
 									true);
 						}
 
-						if(evt->m_fdinfo->is_role_client())
+						if(fdinfo->is_role_client())
 						{
-							swap_ipv4_addresses(evt->m_fdinfo);
+							swap_ipv4_addresses(fdinfo);
 						}
 
-						sinsp_utils::sockinfo_to_str(&evt->m_fdinfo->m_sockinfo,
+						sinsp_utils::sockinfo_to_str(&fdinfo->m_sockinfo,
 							fdtype, &evt->m_paramstr_storage[0],
 							evt->m_paramstr_storage.size());
 
-						evt->m_fdinfo->m_name = &evt->m_paramstr_storage[0];
+						fdinfo->m_name = &evt->m_paramstr_storage[0];
 					}
 					else
 					{
-						evt->m_fdinfo->m_name = evt->get_param_as_str(tupleparam, &parstr, sinsp_evt::PF_SIMPLE);
+						fdinfo->m_name = evt->get_param_as_str(tupleparam, &parstr, sinsp_evt::PF_SIMPLE);
 					}
 				}
 			}
@@ -1906,7 +1975,7 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 				tupleparam = 2;
 			}
 
-			if(tupleparam != -1 && (evt->m_fdinfo->m_name.length() == 0  || evt->m_fdinfo->is_udp_socket()))
+			if(tupleparam != -1 && (fdinfo->m_name.length() == 0  || fdinfo->is_udp_socket()))
 			{
 				//
 				// sendto contains tuple info in the enter event.
@@ -1922,32 +1991,32 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 				{
 					const char *parstr;
 
-					scap_fd_type fdtype = evt->m_fdinfo->m_type;
+					scap_fd_type fdtype = fdinfo->m_type;
 
 					if(fdtype == SCAP_FD_IPV4_SOCK)
 					{
-						if(evt->m_fdinfo->is_role_none())
+						if(fdinfo->is_role_none())
 						{
-								evt->m_fdinfo->set_net_role_by_guessing(m_inspector,
+								fdinfo->set_net_role_by_guessing(m_inspector,
 									evt->m_tinfo,
-									evt->m_fdinfo,
+									fdinfo,
 									false);
 						}
 
-						if(evt->m_fdinfo->is_role_server())
+						if(fdinfo->is_role_server())
 						{
-							swap_ipv4_addresses(evt->m_fdinfo);
+							swap_ipv4_addresses(fdinfo);
 						}
 
-						sinsp_utils::sockinfo_to_str(&evt->m_fdinfo->m_sockinfo,
+						sinsp_utils::sockinfo_to_str(&fdinfo->m_sockinfo,
 							fdtype, &evt->m_paramstr_storage[0],
 							evt->m_paramstr_storage.size());
 
-						evt->m_fdinfo->m_name = &evt->m_paramstr_storage[0];
+						fdinfo->m_name = &evt->m_paramstr_storage[0];
 					}
 					else
 					{
-						evt->m_fdinfo->m_name = enter_evt->get_param_as_str(tupleparam, &parstr, sinsp_evt::PF_SIMPLE);
+						fdinfo->m_name = enter_evt->get_param_as_str(tupleparam, &parstr, sinsp_evt::PF_SIMPLE);
 					}
 				}
 			}

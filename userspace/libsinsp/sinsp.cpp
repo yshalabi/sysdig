@@ -176,9 +176,79 @@ void sinsp::open(uint32_t timeout_ms)
 	init();
 }
 
+#include <time.h>
+
+inline bool sinsp_usrevtparser::parse(char* evtstr)
+{
+	char* p = evtstr;
+	m_state = ST_START;
+	char* token_start;
+
+	while(*p != 0)
+	{
+/*
+		switch(m_state)
+		{
+		case ST_START:
+			if(*p == '[')
+			{
+				token_start = p + 1;
+				m_state = ST_ID;
+			}
+
+			break;
+		case ST_ID:
+			if(*p == ',')
+			{
+				*p = 0;
+				char temp;
+				if(std::sscanf(token_start, "%" PRId64 "%c", &m_id, &temp) != 1)
+				{
+					return false;
+				}
+				m_state = ST_GRP;
+			}
+
+			break;
+		case ST_GRP:
+			break;
+		default:
+			ASSERT(false);
+			return false;
+		}
+*/
+		p++;
+	}
+
+	return true;
+}
+
 void sinsp::open(string filename)
 {
 	char error[SCAP_LASTERR_SIZE];
+
+char doc[] = "[12435, \">\"]";
+char buffer[sizeof(doc)];
+sinsp_usrevtparser p;
+printf("1\n");
+
+float cpu_time = ((float)clock ()) / CLK_TCK;
+
+for(uint64_t j = 0; j < 100000000; j++)
+{
+	memcpy(buffer, doc, sizeof(doc));
+//	p.parse(buffer);
+/*
+	char* p = buffer;
+	while(*p != 0)
+	{
+		p++;
+	}
+*/
+}
+printf("2\n");
+cpu_time = ((float)clock()/CLK_TCK) - cpu_time;
+printf ("tempo: %5.2f\n", cpu_time);
 
 	m_islive = false;
 
@@ -464,7 +534,7 @@ int32_t sinsp::next(OUT sinsp_evt **evt)
 #endif
 
 #if defined(HAS_FILTERING) && defined(HAS_CAPTURE_FILTERING)
-	if(m_evt.m_filtered_out)
+	if(m_evt.m_flt_flag == sinsp_evt::FF_FILTER_OUT)
 	{
 		*evt = &m_evt;
 		return SCAP_TIMEOUT;

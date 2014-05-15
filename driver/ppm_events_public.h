@@ -414,7 +414,9 @@ enum ppm_event_type {
 	PPME_SYSCALL_FCNTL_X = 151,	/* For internal use */
 	PPME_SCHEDSWITCHEX_E = 152,
 	PPME_SCHEDSWITCHEX_X = 153,	/* This should never be called */
-	PPM_EVENT_MAX = 154,
+	PPME_USER_E = 154,
+	PPME_USER_X = 155,
+	PPM_EVENT_MAX = 156,
 };
 /*@}*/
 
@@ -760,7 +762,7 @@ enum ppm_event_flags {
 	EF_READS_FROM_FD = (1 << 3), /* This event reads data from an FD. */
 	EF_WRITES_TO_FD = (1 << 4), /* This event writes data to an FD. */
 	EF_MODIFIES_STATE = (1 << 5), /* This event causes the machine state to change and should not be dropped by the filtering engine. */
-	EF_UNUSED = (1 << 6), /* This event is no */
+	EF_UNUSED = (1 << 6), /* This event is a placeholder and should never be seen in the stream */
 	EF_WAITS = (1 << 7), /* This event reads data from an FD. */
 };
 
@@ -870,7 +872,6 @@ struct ppm_evt_hdr {
 	uint64_t tid; /* the tid of the thread that generated this event */
 	uint32_t len; /* the event len, including the header */
 	uint16_t type; /* the event type */
-/* uint16_t cpuid; the cpu that generated the event */
 };
 #if defined __sun
 #pragma pack()

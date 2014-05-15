@@ -418,7 +418,7 @@ captureinfo do_inspect(sinsp* inspector,
 
 		if(res == SCAP_TIMEOUT)
 		{
-			if(ev != NULL && ev->is_filtered_out())
+			if(ev != NULL && ev->get_filter_flag() == sinsp_evt::FF_FILTER_OUT)
 			{
 				//
 				// The event has been dropped by the filtering system.
@@ -1076,6 +1076,7 @@ exit:
 
 #ifdef _WIN32
 	_CrtDumpMemoryLeaks();
+	Sleep(1000000);
 #endif
 
 	return res;

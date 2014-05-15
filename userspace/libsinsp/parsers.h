@@ -85,6 +85,7 @@ private:
 	void parse_fcntl_enter(sinsp_evt* evt);
 	void parse_fcntl_exit(sinsp_evt* evt);
 	void parse_context_switch(sinsp_evt* evt);
+	void parse_userevt(sinsp_evt *evt);
 
 	inline void add_socket(sinsp_evt* evt, int64_t fd, uint32_t domain, uint32_t type, uint32_t protocol);
 	inline void add_pipe(sinsp_evt *evt, int64_t tid, int64_t fd, uint64_t ino);
@@ -109,9 +110,10 @@ private:
 
 	// Temporary storage to avoid memory allocation
 	sinsp_evt m_tmp_evt;
-	// The transaction table. Key pair is <tid, fd>.
-//	unordered_map<pair<int64_t, int64_t>, sinsp_transactinfo> m_transactable;
+	uint8_t m_fake_userevt_storage[4096];
+	scap_evt* m_fake_userevt;
 
+	// FD listener callback
 	sinsp_fd_listener* m_fd_listener;
 
 	friend class sinsp_analyzer;

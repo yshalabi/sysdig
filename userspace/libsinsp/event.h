@@ -114,6 +114,16 @@ public:
 		SC_IPC = 5,
 	};
 
+	/*!
+	  \brief Event filtering flags.
+	*/
+	enum flt_flag
+	{
+		FF_ACCEPT = 0, ///< The event does not get filtered out
+		FF_FILTER_OUT = (1 << 0), ///< The event gets filtered out and won't go through the engine
+		FF_FILTER_DONT_DISPLAY = (1 << 1),	///< The event is filtered out and won't be displayed on the screen, but it will go through the engine
+	};
+
 	enum fd_number_type
 	{
 		INVALID_FD_NUM = -100000
@@ -256,7 +266,7 @@ public:
 	/*!
 	  \brief Return true if the event has been rejected by the filtering system.
 	*/
-	bool is_filtered_out();
+	flt_flag get_filter_flag();
 #endif
 
 // Doxygen doesn't understand VISIBILITY_PRIVATE
@@ -298,7 +308,7 @@ VISIBILITY_PRIVATE
 	uint32_t m_iosize;
 	int32_t m_errorcode;
 #ifdef HAS_FILTERING
-	bool m_filtered_out;
+	flt_flag m_flt_flag;
 #endif
 
 	friend class sinsp;
