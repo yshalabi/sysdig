@@ -44,7 +44,7 @@ along with sysdig.  If not, see <http://www.gnu.org/licenses/>.
 bool should_drop(sinsp_evt *evt);
 #endif
 
-#if 1
+#if 0
 #include <time.h>
 
 sinsp_parser::sinsp_parser(sinsp *inspector) :
@@ -60,7 +60,7 @@ sinsp_parser::sinsp_parser(sinsp *inspector) :
 
 
 
-char doc[] = "[123, >, [mysql], [{\"argname1\":\"argval1\"}]]";
+char doc[] = "[12435, >, [\"mysql\", \"query\", \"init\"], [{\"argname1\":\"argval1\"}, {\"argname2\":\"argval2\"}, {\"argname3\":\"argval3\"}]]";
 char buffer[sizeof(doc)];
 sinsp_usrevtparser p;
 bool res;
@@ -2772,7 +2772,10 @@ inline bool sinsp_usrevtparser::parse(char* evtstr)
 			{
 				if(!in_quotes)
 				{
-					return false;
+					if(*p != ' ')
+					{
+						return false;
+					}
 				}
 			}
 
