@@ -2716,7 +2716,6 @@ inline bool sinsp_usrevtparser::parse(char* evtstr)
 			}
 			else if(*p != ' ' && *p != '"')
 			{
-				printf("ciao\n");
 				return false;
 			}
 			break;
@@ -2735,6 +2734,11 @@ inline bool sinsp_usrevtparser::parse(char* evtstr)
 			}
 			else if (*p == '"')
 			{
+				if(nsqbrk != 2)
+				{
+					return false;
+				}
+
 				if(!in_quotes)
 				{
 					in_quotes = true;
@@ -2761,10 +2765,6 @@ inline bool sinsp_usrevtparser::parse(char* evtstr)
 					if(nsqbrk == 1)
 					{
 						m_state = ST_ARGS;
-					}
-					else
-					{
-						ASSERT(nsqbrk == 2);
 					}
 				}
 			}
@@ -2861,6 +2861,13 @@ inline bool sinsp_usrevtparser::parse(char* evtstr)
 					is_arg_val = true;
 				}
 			}
+			else
+			{
+				if(!in_quotes)
+				{
+					return false;
+				}				
+			}
 
 			break;
 		case ST_END:
@@ -2882,7 +2889,7 @@ inline bool sinsp_usrevtparser::parse(char* evtstr)
 		p++;
 	}
 
-	if(m_state == ST_END && nsqbrk == 0)
+	if(m_state == ST_END && nsqbrk == 0 && ncbrk == 0)
 	{
 		return true;		
 	}
