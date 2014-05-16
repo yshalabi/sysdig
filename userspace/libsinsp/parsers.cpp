@@ -2792,7 +2792,7 @@ inline bool sinsp_usrevtparser::parse(char* evtstr)
 					}
 				}
 			}
-			if(*p == '{')
+			else if(*p == '{')
 			{
 				if(!in_quotes)
 				{
@@ -2865,7 +2865,10 @@ inline bool sinsp_usrevtparser::parse(char* evtstr)
 			{
 				if(!in_quotes)
 				{
-					return false;
+					if(*p != ' ' && *p != ',')
+					{
+						return false;
+					}
 				}				
 			}
 
