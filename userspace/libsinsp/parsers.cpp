@@ -80,7 +80,7 @@ void sinsp_parser::process_event(sinsp_evt *evt)
 		if(evt->get_tid() == m_sysdig_pid && etype != PPME_SCHEDSWITCH_E && 
 			m_sysdig_pid && etype != PPME_SCHEDSWITCHEX_E)
 		{
-			evt->m_filtered_out = true;
+			evt->m_flt_flag = sinsp_evt::FF_FILTER_OUT;
 			return;
 		}
 	}
