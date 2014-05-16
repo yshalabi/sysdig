@@ -34,7 +34,12 @@ public:
 	vector<char*> m_argnames;
 	vector<char*> m_argvals;
 
-private:
+VISIBILITY_PRIVATE
+	//
+	// For testing purposes
+	//
+	bool parse_test(char* evtstr);
+
 	enum state
 	{
 		ST_START,

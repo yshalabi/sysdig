@@ -44,6 +44,67 @@ along with sysdig.  If not, see <http://www.gnu.org/licenses/>.
 bool should_drop(sinsp_evt *evt);
 #endif
 
+#if 0
+#include <time.h>
+
+sinsp_parser::sinsp_parser(sinsp *inspector) :
+	m_inspector(inspector),
+	m_tmp_evt(m_inspector),
+	m_fd_listener(NULL)
+{
+	m_fake_userevt = (scap_evt*)m_fake_userevt_storage;
+#if defined(HAS_CAPTURE)
+	m_sysdig_pid = getpid();
+#endif
+
+
+
+
+char doc[] = "[12435, >, [\"mysql\"], [{\"argname1\":\"argval1\"}, {\"argname2\":\"argval2\"}, {\"argname3\":\"argval3\"}]]";
+char buffer[sizeof(doc)];
+sinsp_usrevtparser p;
+bool res;
+printf("1\n");
+
+float cpu_time = ((float)clock ()) / CLOCKS_PER_SEC;
+
+for(uint64_t j = 0; j < 10000000; j++)
+{
+	memcpy(buffer, doc, sizeof(doc));
+	res = p.parse(buffer);
+/*
+	char* p = buffer;
+	while(*p != 0)
+	{
+		p++;
+	}
+*/
+	if(res != true)
+	{
+		printf("ERROR\n");
+	}
+}
+printf("2 %s %s\n", (p.m_is_enter)?"enter":"exit", p.m_id);
+for(uint64_t j = 0; j < p.m_tags.size(); j++)
+{
+	printf("*%s\n", p.m_tags[j]);
+}
+for(uint64_t j = 0; j < p.m_argnames.size(); j++)
+{
+	printf("!%s\n", p.m_argnames[j]);
+}
+for(uint64_t j = 0; j < p.m_argvals.size(); j++)
+{
+	printf("#%s\n", p.m_argvals[j]);
+}
+cpu_time = ((float)clock()/ CLOCKS_PER_SEC) - cpu_time;
+printf ("tempo: %5.2f\n", cpu_time);
+
+
+
+}
+#else
+
 sinsp_parser::sinsp_parser(sinsp *inspector) :
 	m_inspector(inspector),
 	m_tmp_evt(m_inspector),
@@ -54,6 +115,7 @@ sinsp_parser::sinsp_parser(sinsp *inspector) :
 	m_sysdig_pid = getpid();
 #endif
 }
+#endif
 
 sinsp_parser::~sinsp_parser()
 {
@@ -2614,11 +2676,24 @@ inline bool sinsp_usrevtparser::parse(char* evtstr)
 		switch(m_state)
 		{
 		case ST_START:
-			if(*p == '[')
+			if(!isdigit(*p))
 			{
-				nsqbrk++;
-				token_start = p + 1;
-				m_state = ST_ID;
+				if(*p == '[')
+				{
+					nsqbrk++;
+
+					if(nsqbrk != 1)
+					{
+						return false;
+					}
+
+					token_start = p + 1;
+					m_state = ST_ID;
+				}
+				else
+				{
+					return false;
+				}
 			}
 
 			break;
@@ -2639,7 +2714,7 @@ inline bool sinsp_usrevtparser::parse(char* evtstr)
 			}
 			else if(*p == '<')
 			{
-				m_is_enter = true;
+				m_is_enter = false;
 			}
 			else if(*p == ',')
 			{
@@ -2811,4 +2886,9 @@ inline bool sinsp_usrevtparser::parse(char* evtstr)
 	{
 		return false;
 	}
+}
+
+bool sinsp_usrevtparser::parse_test(char* evtstr)
+{
+	return parse(evtstr);
 }
