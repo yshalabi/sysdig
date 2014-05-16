@@ -355,24 +355,23 @@ inline bool sinsp_usrevtparser::parse(char* evtstr)
 				if(!in_quotes)
 				{
 					nsqbrk--;
-				}
-			}
-			else if (*p == ',')
-			{
-				if(!in_quotes)
-				{
+
 					if(nsqbrk == 1)
 					{
 						m_state = ST_END;
 					}
-					else
+				}
+			}
+			else if (*p == ':')
+			{
+				if(!in_quotes)
+				{
+					if(nsqbrk != 2 || ncbrk != 1)
 					{
-						ASSERT(nsqbrk == 1);
-						if(ncbrk == 1)
-						{
-							is_arg_val = true;
-						}
+						return false;
 					}
+
+					is_arg_val = true;
 				}
 			}
 
@@ -381,7 +380,13 @@ inline bool sinsp_usrevtparser::parse(char* evtstr)
 			if (*p == ']')
 			{
 				nsqbrk--;
-			}			
+			}
+			else
+			{
+				return false;
+			}
+
+			break;
 		default:
 			ASSERT(false);
 			return false;
@@ -412,10 +417,10 @@ printf("1\n");
 
 float cpu_time = ((float)clock ()) / CLOCKS_PER_SEC;
 
-for(uint64_t j = 0; j < 10000000; j++)
+for(uint64_t j = 0; j < 10; j++)
 {
-	res = memcpy(buffer, doc, sizeof(doc));
-	p.parse(buffer);
+	memcpy(buffer, doc, sizeof(doc));
+	res = p.parse(buffer);
 /*
 	char* p = buffer;
 	while(*p != 0)
