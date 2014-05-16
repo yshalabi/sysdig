@@ -159,18 +159,22 @@ class sinsp_usrevtparser
 public:
 	inline bool parse(char* evtstr);
 
+	bool m_is_enter;
+	char* m_id;
+	vector<char*> m_tags;
+	vector<char*> m_argnames;
+	vector<char*> m_argvals;
+
 private:
 	enum state
 	{
-		ST_START =   (1 << 0),
-		ST_ID =   (1 << 1),
-		ST_GRP =   (1 << 2),
+		ST_START,
+		ST_ID,
+		ST_DIR,
+		ST_TAGS,
+		ST_ARGS,
+		ST_END,
 	};
 
 	state m_state;
-	bool is_enter;
-	uint64_t m_id;
-	vector<char*> m_groups;
-	vector<char*> m_argnames;
-	vector<char*> m_argvals;
 };

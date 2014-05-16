@@ -182,16 +182,28 @@ inline bool sinsp_usrevtparser::parse(char* evtstr)
 {
 	char* p = evtstr;
 	m_state = ST_START;
-	char* token_start;
+	char* token_start = NULL;
+	uint32_t nsqbrk = 0;
+	uint32_t ncbrk = 0;
+	bool in_quotes = false;
+	uint32_t is_arg_val = false;
+
+	//
+	// Reset the content
+	//
+	m_id = NULL;
+	m_tags.clear();
+	m_argnames.clear();
+	m_argvals.clear();
 
 	while(*p != 0)
 	{
-/*
 		switch(m_state)
 		{
 		case ST_START:
 			if(*p == '[')
 			{
+				nsqbrk++;
 				token_start = p + 1;
 				m_state = ST_ID;
 			}
@@ -201,43 +213,209 @@ inline bool sinsp_usrevtparser::parse(char* evtstr)
 			if(*p == ',')
 			{
 				*p = 0;
-				char temp;
-				if(std::sscanf(token_start, "%" PRId64 "%c", &m_id, &temp) != 1)
-				{
-					return false;
-				}
-				m_state = ST_GRP;
+				//char temp;
+				//if(std::sscanf(token_start, "%" PRId64 "%c", &m_id, &temp) != 1)
+				//{
+				//	return false;
+				//}
+				m_id = token_start;
+
+				m_state = ST_DIR;
 			}
 
 			break;
-		case ST_GRP:
+		case ST_DIR:
+			if(*p == '>')
+			{
+				m_is_enter = true;
+			}
+			else if(*p == '<')
+			{
+				m_is_enter = true;
+			}
+			else if(*p == ',')
+			{
+				m_state = ST_TAGS;
+			}
+			else if(*p != ' ' && *p != '"')
+			{
+				printf("ciao\n");
+				return false;
+			}
 			break;
+		case ST_TAGS:
+			if(*p == '[')
+			{
+				if(!in_quotes)
+				{
+					nsqbrk++;					
+				}
+			}
+			else if (*p == '"')
+			{
+				if(nsqbrk != 2)
+				{
+					return false;
+				}
+
+				if(!in_quotes)
+				{
+					in_quotes = true;
+					token_start = p + 1;
+				}
+				else
+				{
+					in_quotes = false;
+					*p = 0;
+					m_tags.push_back(token_start);
+				}
+			}
+			else if (*p == ']')
+			{
+				if(!in_quotes)
+				{
+					nsqbrk--;
+				}
+			}
+			else if (*p == ',')
+			{
+				if(!in_quotes)
+				{
+					if(nsqbrk == 1)
+					{
+						m_state = ST_ARGS;
+					}
+					else
+					{
+						ASSERT(nsqbrk == 2);
+					}
+				}
+			}
+
+			break;
+		case ST_ARGS:
+			if(*p == '[')
+			{
+				if(!in_quotes)
+				{
+					nsqbrk++;
+					if(nsqbrk != 2)
+					{
+						return false;
+					}
+				}
+			}
+			if(*p == '{')
+			{
+				if(!in_quotes)
+				{
+					is_arg_val = false;
+					ncbrk++;
+					if(ncbrk != 1)
+					{
+						return false;
+					}
+				}
+			}
+			else if (*p == '"')
+			{
+				if(nsqbrk != 2 || ncbrk != 1)
+				{
+					return false;
+				}
+
+				if(!in_quotes)
+				{
+					in_quotes = true;
+					token_start = p + 1;
+				}
+				else
+				{
+					in_quotes = false;
+					*p = 0;
+					if(is_arg_val)
+					{
+						m_argvals.push_back(token_start);
+					}
+					else
+					{
+						m_argnames.push_back(token_start);						
+					}
+				}
+			}
+			else if (*p == '}')
+			{
+				if(!in_quotes)
+				{
+					ncbrk--;
+				}
+			}
+			else if (*p == ']')
+			{
+				if(!in_quotes)
+				{
+					nsqbrk--;
+				}
+			}
+			else if (*p == ',')
+			{
+				if(!in_quotes)
+				{
+					if(nsqbrk == 1)
+					{
+						m_state = ST_END;
+					}
+					else
+					{
+						ASSERT(nsqbrk == 1);
+						if(ncbrk == 1)
+						{
+							is_arg_val = true;
+						}
+					}
+				}
+			}
+
+			break;
+		case ST_END:
+			if (*p == ']')
+			{
+				nsqbrk--;
+			}			
 		default:
 			ASSERT(false);
 			return false;
 		}
-*/
+
 		p++;
 	}
 
-	return true;
+	if(m_state == ST_END && nsqbrk == 0)
+	{
+		return true;		
+	}
+	else
+	{
+		return false;
+	}
 }
 
 void sinsp::open(string filename)
 {
 	char error[SCAP_LASTERR_SIZE];
 
-char doc[] = "[12435, \">\"]";
+char doc[] = "[12435, >, [\"mysql\", \"query\", \"init\"], [{\"argname1\":\"argval1\"}, {\"argname2\":\"argval2\"}, {\"argname3\":\"argval3\"}]]";
 char buffer[sizeof(doc)];
 sinsp_usrevtparser p;
+bool res;
 printf("1\n");
 
-float cpu_time = ((float)clock ()) / CLK_TCK;
+float cpu_time = ((float)clock ()) / CLOCKS_PER_SEC;
 
-for(uint64_t j = 0; j < 100000000; j++)
+for(uint64_t j = 0; j < 10000000; j++)
 {
-	memcpy(buffer, doc, sizeof(doc));
-//	p.parse(buffer);
+	res = memcpy(buffer, doc, sizeof(doc));
+	p.parse(buffer);
 /*
 	char* p = buffer;
 	while(*p != 0)
@@ -245,9 +423,25 @@ for(uint64_t j = 0; j < 100000000; j++)
 		p++;
 	}
 */
+	if(res != true)
+	{
+		printf("ERROR\n");
+	}
 }
-printf("2\n");
-cpu_time = ((float)clock()/CLK_TCK) - cpu_time;
+printf("2 %s %s\n", (p.m_is_enter)?"enter":"exit", p.m_id);
+for(uint64_t j = 0; j < p.m_tags.size(); j++)
+{
+	printf("*%s\n", p.m_tags[j]);
+}
+for(uint64_t j = 0; j < p.m_argnames.size(); j++)
+{
+	printf("!%s\n", p.m_argnames[j]);
+}
+for(uint64_t j = 0; j < p.m_argvals.size(); j++)
+{
+	printf("#%s\n", p.m_argvals[j]);
+}
+cpu_time = ((float)clock()/ CLOCKS_PER_SEC) - cpu_time;
 printf ("tempo: %5.2f\n", cpu_time);
 
 	m_islive = false;
