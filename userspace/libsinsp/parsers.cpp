@@ -2676,34 +2676,28 @@ inline bool sinsp_usrevtparser::parse(char* evtstr)
 		switch(m_state)
 		{
 		case ST_START:
+			if(*p == '[')
+			{
+				nsqbrk++;
+				token_start = p + 1;
+				m_state = ST_ID;
+			}
+
+			break;
+		case ST_ID:
 			if(!isdigit(*p))
 			{
-				if(*p == '[')
+				if(*p == ',')
 				{
-					nsqbrk++;
+					*p = 0;
+					m_id = token_start;
 
-					if(nsqbrk != 1)
-					{
-						return false;
-					}
-
-					token_start = p + 1;
-					m_state = ST_ID;
+					m_state = ST_DIR;
 				}
 				else
 				{
 					return false;
 				}
-			}
-
-			break;
-		case ST_ID:
-			if(*p == ',')
-			{
-				*p = 0;
-				m_id = token_start;
-
-				m_state = ST_DIR;
 			}
 
 			break;
