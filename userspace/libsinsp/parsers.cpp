@@ -2587,3 +2587,228 @@ void sinsp_parser::parse_context_switch(sinsp_evt* evt)
 		ASSERT(parinfo->m_len == sizeof(uint32_t));
 	}
 }
+
+//////////////////////////////////////////////////////////////////////////////
+// sinsp_usrevtparser implementation
+///////////////////////////////////////////////////////////////////////////////
+inline bool sinsp_usrevtparser::parse(char* evtstr)
+{
+	char* p = evtstr;
+	m_state = ST_START;
+	char* token_start = NULL;
+	uint32_t nsqbrk = 0;
+	uint32_t ncbrk = 0;
+	bool in_quotes = false;
+	uint32_t is_arg_val = false;
+
+	//
+	// Reset the content
+	//
+	m_id = NULL;
+	m_tags.clear();
+	m_argnames.clear();
+	m_argvals.clear();
+
+	while(*p != 0)
+	{
+		switch(m_state)
+		{
+		case ST_START:
+			if(*p == '[')
+			{
+				nsqbrk++;
+				token_start = p + 1;
+				m_state = ST_ID;
+			}
+
+			break;
+		case ST_ID:
+			if(*p == ',')
+			{
+				*p = 0;
+				m_id = token_start;
+
+				m_state = ST_DIR;
+			}
+
+			break;
+		case ST_DIR:
+			if(*p == '>')
+			{
+				m_is_enter = true;
+			}
+			else if(*p == '<')
+			{
+				m_is_enter = true;
+			}
+			else if(*p == ',')
+			{
+				m_state = ST_TAGS;
+			}
+			else if(*p != ' ' && *p != '"')
+			{
+				printf("ciao\n");
+				return false;
+			}
+			break;
+		case ST_TAGS:
+			if(*p == '[')
+			{
+				if(!in_quotes)
+				{
+					nsqbrk++;					
+				}
+			}
+			else if (*p == '"')
+			{
+				if(nsqbrk != 2)
+				{
+					return false;
+				}
+
+				if(!in_quotes)
+				{
+					in_quotes = true;
+					token_start = p + 1;
+				}
+				else
+				{
+					in_quotes = false;
+					*p = 0;
+					m_tags.push_back(token_start);
+				}
+			}
+			else if (*p == ']')
+			{
+				if(!in_quotes)
+				{
+					nsqbrk--;
+				}
+			}
+			else if (*p == ',')
+			{
+				if(!in_quotes)
+				{
+					if(nsqbrk == 1)
+					{
+						m_state = ST_ARGS;
+					}
+					else
+					{
+						ASSERT(nsqbrk == 2);
+					}
+				}
+			}
+
+			break;
+		case ST_ARGS:
+			if(*p == '[')
+			{
+				if(!in_quotes)
+				{
+					nsqbrk++;
+					if(nsqbrk != 2)
+					{
+						return false;
+					}
+				}
+			}
+			if(*p == '{')
+			{
+				if(!in_quotes)
+				{
+					is_arg_val = false;
+					ncbrk++;
+					if(ncbrk != 1)
+					{
+						return false;
+					}
+				}
+			}
+			else if (*p == '"')
+			{
+				if(nsqbrk != 2 || ncbrk != 1)
+				{
+					return false;
+				}
+
+				if(!in_quotes)
+				{
+					in_quotes = true;
+					token_start = p + 1;
+				}
+				else
+				{
+					in_quotes = false;
+					*p = 0;
+					if(is_arg_val)
+					{
+						m_argvals.push_back(token_start);
+					}
+					else
+					{
+						m_argnames.push_back(token_start);						
+					}
+				}
+			}
+			else if (*p == '}')
+			{
+				if(!in_quotes)
+				{
+					ncbrk--;
+				}
+			}
+			else if (*p == ']')
+			{
+				if(!in_quotes)
+				{
+					nsqbrk--;
+
+					if(nsqbrk == 1)
+					{
+						m_state = ST_END;
+					}
+				}
+			}
+			else if (*p == ':')
+			{
+				if(!in_quotes)
+				{
+					if(nsqbrk != 2 || ncbrk != 1)
+					{
+						return false;
+					}
+
+					is_arg_val = true;
+				}
+			}
+
+			break;
+		case ST_END:
+			if (*p == ']')
+			{
+				nsqbrk--;
+			}
+			else
+			{
+				return false;
+			}
+
+			break;
+		default:
+			ASSERT(false);
+			return false;
+		}
+
+		p++;
+	}
+
+	if(m_state == ST_END && nsqbrk == 0)
+	{
+		return true;		
+	}
+	else
+	{
+		return false;
+	}
+}

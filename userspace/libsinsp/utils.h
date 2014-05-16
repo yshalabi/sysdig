@@ -150,31 +150,3 @@ public:
 	static bool tryparseu64(const string& str, uint64_t* res);
 	static bool tryparsed64(const string& str, int64_t* res);
 };
-
-///////////////////////////////////////////////////////////////////////////////
-// user event parser
-///////////////////////////////////////////////////////////////////////////////
-class sinsp_usrevtparser
-{
-public:
-	inline bool parse(char* evtstr);
-
-	bool m_is_enter;
-	char* m_id;
-	vector<char*> m_tags;
-	vector<char*> m_argnames;
-	vector<char*> m_argvals;
-
-private:
-	enum state
-	{
-		ST_START,
-		ST_ID,
-		ST_DIR,
-		ST_TAGS,
-		ST_ARGS,
-		ST_END,
-	};
-
-	state m_state;
-};

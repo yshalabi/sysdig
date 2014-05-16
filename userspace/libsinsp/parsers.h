@@ -16,13 +16,41 @@ You should have received a copy of the GNU General Public License
 along with sysdig.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-////////////////////////////////////////////////////////////////////////////
-// Public definitions for the scap library
-////////////////////////////////////////////////////////////////////////////
 #pragma once
 
 class sinsp_fd_listener;
 
+///////////////////////////////////////////////////////////////////////////////
+// user event parser
+///////////////////////////////////////////////////////////////////////////////
+class sinsp_usrevtparser
+{
+public:
+	inline bool parse(char* evtstr);
+
+	bool m_is_enter;
+	char* m_id;
+	vector<char*> m_tags;
+	vector<char*> m_argnames;
+	vector<char*> m_argvals;
+
+private:
+	enum state
+	{
+		ST_START,
+		ST_ID,
+		ST_DIR,
+		ST_TAGS,
+		ST_ARGS,
+		ST_END,
+	};
+
+	state m_state;
+};
+
+////////////////////////////////////////////////////////////////////////////
+// Event parser class
+////////////////////////////////////////////////////////////////////////////
 class sinsp_parser
 {
 public:
@@ -45,6 +73,10 @@ public:
 	//
 	static void parse_openat_dir(sinsp_evt *evt, char* name, int64_t dirfd, OUT string* sdir);
 
+	//
+	// Parser for the user events. Public so that filter fields can access it
+	//
+	sinsp_usrevtparser m_userevt_parser;
 private:
 	//
 	// Helpers
