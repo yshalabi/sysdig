@@ -2653,7 +2653,6 @@ void sinsp_parser::parse_context_switch(sinsp_evt* evt)
 //////////////////////////////////////////////////////////////////////////////
 // sinsp_usrevtparser implementation
 ///////////////////////////////////////////////////////////////////////////////
-//"[\"12435\", >, [\"mysql\", \"query\", \"init\"], [{\"argname1\":\"argval1\"}, {\"argname2\":\"argval2\"}, {\"argname3\":\"argval3\"}]]";
 inline bool sinsp_usrevtparser::skip_spaces(char* p, uint32_t* delta)
 {
 	char* start = p;
@@ -2879,11 +2878,6 @@ inline bool sinsp_usrevtparser::parse(char* evtstr)
 {
 	char* p = evtstr;
 	m_state = ST_START;
-	char* token_start = NULL;
-	uint32_t nsqbrk = 0;
-	uint32_t ncbrk = 0;
-	bool in_quotes = false;
-	uint32_t is_arg_val = false;
 	uint32_t delta;
 	char* tstr;
 
