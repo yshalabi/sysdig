@@ -35,6 +35,15 @@ public:
 	vector<char*> m_argvals;
 
 VISIBILITY_PRIVATE
+	bool skip_spaces(char* p, uint32_t* delta);
+	bool skip_spaces_and_commas(char* p, uint32_t* delta);
+	bool skip_spaces_and_columns(char* p, uint32_t* delta);
+	bool skip_spaces_and_commas_and_sq_brakets(char* p, uint32_t* delta);
+	bool skip_spaces_and_commas_and_cr_brakets(char* p, uint32_t* delta);
+	bool skip_spaces_and_commas_and_all_brakets(char* p, uint32_t* delta);
+
+	bool parsestr(char* p, char** res, uint32_t* delta);
+
 	//
 	// For testing purposes
 	//
