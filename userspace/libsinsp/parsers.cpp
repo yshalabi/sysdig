@@ -44,7 +44,7 @@ along with sysdig.  If not, see <http://www.gnu.org/licenses/>.
 bool should_drop(sinsp_evt *evt);
 #endif
 
-#if 1
+#if 0
 #include <time.h>
 
 sinsp_parser::sinsp_parser(sinsp *inspector) :
