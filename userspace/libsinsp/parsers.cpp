@@ -2672,18 +2672,37 @@ inline bool sinsp_usrevtparser::skip_spaces(char* p, uint32_t* delta)
 	return true;
 }
 
-inline bool sinsp_usrevtparser::skip_spaces_and_commas(char* p, uint32_t* delta)
+inline bool sinsp_usrevtparser::skip_spaces_and_commas(char* p, uint32_t* delta, uint32_t n_expected_commas)
 {
 	char* start = p;
+	uint32_t nc = 0;
 
-	while(*p == ' ' || *p == ',')
+	while(true)
 	{
-		if(*p == 0)
+		if(*p == ' ')
+		{
+			p++;
+			continue;
+		}
+		else if(*p == ',')
+		{
+			nc++;
+		}
+		else if(*p == 0)
 		{
 			return false;
 		}
+		else
+		{
+			break;
+		}
 
 		p++;
+	}
+
+	if(nc < n_expected_commas)
+	{
+		return false;
 	}
 
 	*delta = p - start;
@@ -2693,6 +2712,7 @@ inline bool sinsp_usrevtparser::skip_spaces_and_commas(char* p, uint32_t* delta)
 inline bool sinsp_usrevtparser::skip_spaces_and_columns(char* p, uint32_t* delta)
 {
 	char* start = p;
+	uint32_t nc = 0;
 
 	while(*p == ' ' || *p == ':')
 	{
@@ -2700,8 +2720,17 @@ inline bool sinsp_usrevtparser::skip_spaces_and_columns(char* p, uint32_t* delta
 		{
 			return false;
 		}
+		else if(*p == ':')
+		{
+			nc++;
+		}
 
 		p++;
+	}
+
+	if(nc != 1)
+	{
+		return false;
 	}
 
 	*delta = p - start;
@@ -2711,6 +2740,8 @@ inline bool sinsp_usrevtparser::skip_spaces_and_columns(char* p, uint32_t* delta
 inline bool sinsp_usrevtparser::skip_spaces_and_commas_and_sq_brakets(char* p, uint32_t* delta)
 {
 	char* start = p;
+	uint32_t nc = 0;
+	uint32_t nosb = 0;
 
 	while(*p == ' ' || *p == ',' || *p == '[' || *p == ']')
 	{
@@ -2718,8 +2749,21 @@ inline bool sinsp_usrevtparser::skip_spaces_and_commas_and_sq_brakets(char* p, u
 		{
 			return false;
 		}
+		else if(*p == ',')
+		{
+			nc++;
+		}
+		else if(*p == '[')
+		{
+			nosb++;
+		}
 
 		p++;
+	}
+
+	if(nc != 1 || nosb != 1)
+	{
+		return false;
 	}
 
 	*delta = p - start;
@@ -2729,6 +2773,9 @@ inline bool sinsp_usrevtparser::skip_spaces_and_commas_and_sq_brakets(char* p, u
 inline bool sinsp_usrevtparser::skip_spaces_and_commas_and_cr_brakets(char* p, uint32_t* delta)
 {
 	char* start = p;
+	uint32_t nc = 0;
+	uint32_t nocb = 0;
+	uint32_t nccb = 0;
 
 	while(*p == ' ' || *p == ',' || *p == '{' || *p == '}')
 	{
@@ -2736,8 +2783,25 @@ inline bool sinsp_usrevtparser::skip_spaces_and_commas_and_cr_brakets(char* p, u
 		{
 			return false;
 		}
+		else if(*p == ',')
+		{
+			nc++;
+		}
+		else if(*p == '{')
+		{
+			nocb++;
+		}
+		else if(*p == '}')
+		{
+			nccb++;
+		}
 
 		p++;
+	}
+
+	if(!((nc == 1 && nocb == 1) || (nc == 1 && nccb == 1) || (nccb == 1 && *p == ']')))
+	{
+		return false;
 	}
 
 	*delta = p - start;
@@ -2747,6 +2811,9 @@ inline bool sinsp_usrevtparser::skip_spaces_and_commas_and_cr_brakets(char* p, u
 inline bool sinsp_usrevtparser::skip_spaces_and_commas_and_all_brakets(char* p, uint32_t* delta)
 {
 	char* start = p;
+	uint32_t nc = 0;
+	uint32_t nosb = 0;
+	uint32_t nocb = 0;
 
 	while(*p == ' ' || *p == ',' || *p == '[' || *p == ']' || *p == '{' || *p == '}')
 	{
@@ -2754,8 +2821,25 @@ inline bool sinsp_usrevtparser::skip_spaces_and_commas_and_all_brakets(char* p, 
 		{
 			return false;
 		}
+		else if(*p == ',')
+		{
+			nc++;
+		}
+		else if(*p == '[')
+		{
+			nosb++;
+		}
+		else if(*p == '{')
+		{
+			nocb++;
+		}
 
 		p++;
+	}
+
+	if(nc != 1 || nosb != 1 || nocb != 1)
+	{
+		return false;
 	}
 
 	*delta = p - start;
@@ -2834,7 +2918,7 @@ inline bool sinsp_usrevtparser::parse(char* evtstr)
 	}
 	p += delta;
 
-	if(skip_spaces_and_commas(p, &delta) == false)
+	if(skip_spaces_and_commas(p, &delta, 1) == false)
 	{
 		return false;
 	}
@@ -2878,11 +2962,16 @@ inline bool sinsp_usrevtparser::parse(char* evtstr)
 	//
 	while(true)
 	{
-		if(skip_spaces_and_commas(p, &delta) == false)
+		if(skip_spaces_and_commas(p, &delta, 0) == false)
 		{
 			return false;
 		}
 		p += delta;
+
+		if(*p == ']')
+		{
+			break;
+		}
 
 		if(parsestr(p, &tstr, &delta) == false)
 		{
@@ -2890,11 +2979,6 @@ inline bool sinsp_usrevtparser::parse(char* evtstr)
 		}
 		p += delta;
 		m_tags.push_back(tstr);
-
-		if(*p == ']')
-		{
-			break;
-		}
 	}
 
 	//
