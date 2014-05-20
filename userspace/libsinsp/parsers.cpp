@@ -44,7 +44,7 @@ along with sysdig.  If not, see <http://www.gnu.org/licenses/>.
 bool should_drop(sinsp_evt *evt);
 #endif
 
-#if 0
+#if 1
 #include <time.h>
 
 sinsp_parser::sinsp_parser(sinsp *inspector) :
@@ -61,9 +61,10 @@ sinsp_parser::sinsp_parser(sinsp *inspector) :
 
 
 char doc[] = "[\"12435\", >, [\"mysql\", \"query\", \"init\"], [{\"argname1\":\"argval1\"}, {\"argname2\":\"argval2\"}, {\"argname3\":\"argval3\"}]]";
+//char doc[] = "[\"\", <, [\"mysql\"], [{\"argname1\":\"argval1\"}]]";
 char buffer[sizeof(doc)];
 sinsp_usrevtparser p;
-bool res;
+sinsp_usrevtparser::parse_result res;
 printf("1\n");
 
 float cpu_time = ((float)clock ()) / CLOCKS_PER_SEC;
@@ -79,7 +80,7 @@ for(uint64_t j = 0; j < 10000000; j++)
 		p++;
 	}
 */
-	if(res != true)
+	if(res != sinsp_usrevtparser::RES_OK)
 	{
 		printf("ERROR\n");
 	}
@@ -2653,7 +2654,7 @@ void sinsp_parser::parse_context_switch(sinsp_evt* evt)
 //////////////////////////////////////////////////////////////////////////////
 // sinsp_usrevtparser implementation
 ///////////////////////////////////////////////////////////////////////////////
-inline bool sinsp_usrevtparser::skip_spaces(char* p, uint32_t* delta)
+inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::skip_spaces(char* p, uint32_t* delta)
 {
 	char* start = p;
 
@@ -2661,17 +2662,17 @@ inline bool sinsp_usrevtparser::skip_spaces(char* p, uint32_t* delta)
 	{
 		if(*p == 0)
 		{
-			return false;
+			return sinsp_usrevtparser::RES_TRUNCATED;
 		}
 
 		p++;
 	}
 
 	*delta = p - start;
-	return true;
+	return sinsp_usrevtparser::RES_OK;
 }
 
-inline bool sinsp_usrevtparser::skip_spaces_and_commas(char* p, uint32_t* delta, uint32_t n_expected_commas)
+inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::skip_spaces_and_commas(char* p, uint32_t* delta, uint32_t n_expected_commas)
 {
 	char* start = p;
 	uint32_t nc = 0;
@@ -2689,7 +2690,7 @@ inline bool sinsp_usrevtparser::skip_spaces_and_commas(char* p, uint32_t* delta,
 		}
 		else if(*p == 0)
 		{
-			return false;
+			return sinsp_usrevtparser::RES_TRUNCATED;
 		}
 		else
 		{
@@ -2701,14 +2702,14 @@ inline bool sinsp_usrevtparser::skip_spaces_and_commas(char* p, uint32_t* delta,
 
 	if(nc < n_expected_commas)
 	{
-		return false;
+		return sinsp_usrevtparser::RES_FAILED;
 	}
 
 	*delta = p - start;
-	return true;
+	return sinsp_usrevtparser::RES_OK;
 }
 
-inline bool sinsp_usrevtparser::skip_spaces_and_columns(char* p, uint32_t* delta)
+inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::skip_spaces_and_columns(char* p, uint32_t* delta)
 {
 	char* start = p;
 	uint32_t nc = 0;
@@ -2717,7 +2718,7 @@ inline bool sinsp_usrevtparser::skip_spaces_and_columns(char* p, uint32_t* delta
 	{
 		if(*p == 0)
 		{
-			return false;
+			return sinsp_usrevtparser::RES_TRUNCATED;
 		}
 		else if(*p == ':')
 		{
@@ -2729,14 +2730,14 @@ inline bool sinsp_usrevtparser::skip_spaces_and_columns(char* p, uint32_t* delta
 
 	if(nc != 1)
 	{
-		return false;
+		return sinsp_usrevtparser::RES_FAILED;
 	}
 
 	*delta = p - start;
-	return true;
+	return sinsp_usrevtparser::RES_OK;
 }
 
-inline bool sinsp_usrevtparser::skip_spaces_and_commas_and_sq_brakets(char* p, uint32_t* delta)
+inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::skip_spaces_and_commas_and_sq_brakets(char* p, uint32_t* delta)
 {
 	char* start = p;
 	uint32_t nc = 0;
@@ -2746,7 +2747,7 @@ inline bool sinsp_usrevtparser::skip_spaces_and_commas_and_sq_brakets(char* p, u
 	{
 		if(*p == 0)
 		{
-			return false;
+			return sinsp_usrevtparser::RES_TRUNCATED;
 		}
 		else if(*p == ',')
 		{
@@ -2756,20 +2757,27 @@ inline bool sinsp_usrevtparser::skip_spaces_and_commas_and_sq_brakets(char* p, u
 		{
 			nosb++;
 		}
+		else if(*p == ']')
+		{
+			if(nosb != 0)
+			{
+				break;
+			}
+		}
 
 		p++;
 	}
 
 	if(nc != 1 || nosb != 1)
 	{
-		return false;
+		return sinsp_usrevtparser::RES_FAILED;
 	}
 
 	*delta = p - start;
-	return true;
+	return sinsp_usrevtparser::RES_OK;
 }
 
-inline bool sinsp_usrevtparser::skip_spaces_and_commas_and_cr_brakets(char* p, uint32_t* delta)
+inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::skip_spaces_and_commas_and_cr_brakets(char* p, uint32_t* delta)
 {
 	char* start = p;
 	uint32_t nc = 0;
@@ -2780,7 +2788,7 @@ inline bool sinsp_usrevtparser::skip_spaces_and_commas_and_cr_brakets(char* p, u
 	{
 		if(*p == 0)
 		{
-			return false;
+			return sinsp_usrevtparser::RES_TRUNCATED;
 		}
 		else if(*p == ',')
 		{
@@ -2800,14 +2808,14 @@ inline bool sinsp_usrevtparser::skip_spaces_and_commas_and_cr_brakets(char* p, u
 
 	if(!((nc == 1 && nocb == 1) || (nc == 1 && nccb == 1) || (nccb == 1 && *p == ']')))
 	{
-		return false;
+		return sinsp_usrevtparser::RES_FAILED;
 	}
 
 	*delta = p - start;
-	return true;
+	return sinsp_usrevtparser::RES_OK;
 }
 
-inline bool sinsp_usrevtparser::skip_spaces_and_commas_and_all_brakets(char* p, uint32_t* delta)
+inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::skip_spaces_and_commas_and_all_brakets(char* p, uint32_t* delta)
 {
 	char* start = p;
 	uint32_t nc = 0;
@@ -2818,7 +2826,7 @@ inline bool sinsp_usrevtparser::skip_spaces_and_commas_and_all_brakets(char* p, 
 	{
 		if(*p == 0)
 		{
-			return false;
+			return sinsp_usrevtparser::RES_TRUNCATED;
 		}
 		else if(*p == ',')
 		{
@@ -2828,6 +2836,13 @@ inline bool sinsp_usrevtparser::skip_spaces_and_commas_and_all_brakets(char* p, 
 		{
 			nosb++;
 		}
+		else if(*p == ']')
+		{
+			if(nosb != 0)
+			{
+				break;
+			}
+		}
 		else if(*p == '{')
 		{
 			nocb++;
@@ -2836,23 +2851,31 @@ inline bool sinsp_usrevtparser::skip_spaces_and_commas_and_all_brakets(char* p, 
 		p++;
 	}
 
-	if(nc != 1 || nosb != 1 || nocb != 1)
+	if(nc != 1 || nosb != 1)
 	{
-		return false;
+		return sinsp_usrevtparser::RES_FAILED;
+	}
+	else if(nocb != 1)
+	{
+		if(*p != ']')
+		{
+			return sinsp_usrevtparser::RES_FAILED;
+		}
 	}
 
 	*delta = p - start;
-	return true;
+	return sinsp_usrevtparser::RES_OK;
 }
 
-inline bool sinsp_usrevtparser::parsestr(char* p, char** res, uint32_t* delta)
+inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parsestr(char* p, char** res, uint32_t* delta)
 {
 	char* initial = p;
 	*res = NULL;
 
 	if(*p != '"')
 	{
-		return false;
+		*delta = (p - initial + 1);
+		return sinsp_usrevtparser::RES_FAILED;
 	}
 
 	*res = p + 1;
@@ -2862,7 +2885,8 @@ inline bool sinsp_usrevtparser::parsestr(char* p, char** res, uint32_t* delta)
 	{
 		if(*p == 0)
 		{
-			return false;
+			*delta = (p - initial + 1);
+			return sinsp_usrevtparser::RES_TRUNCATED;
 		}
 
 		p++;
@@ -2871,15 +2895,30 @@ inline bool sinsp_usrevtparser::parsestr(char* p, char** res, uint32_t* delta)
 	*p = 0;
 
 	*delta = (p - initial + 1);
-	return true;
+	return sinsp_usrevtparser::RES_OK;
 }
 
-inline bool sinsp_usrevtparser::parse(char* evtstr)
+inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parsestr_not_enforce(char* p, char** res, uint32_t* delta)
+{
+	if(parsestr(p, res, delta) == sinsp_usrevtparser::RES_FAILED)
+	{
+		if(*(p + *delta) == ']')
+		{
+			*res = NULL;
+			return sinsp_usrevtparser::RES_OK;
+		}
+	}
+
+	return sinsp_usrevtparser::RES_OK;
+}
+
+inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parse(char* evtstr)
 {
 	char* p = evtstr;
 	m_state = ST_START;
 	uint32_t delta;
 	char* tstr;
+	sinsp_usrevtparser::parse_result res;
 
 	//
 	// Reset the content
@@ -2889,32 +2928,36 @@ inline bool sinsp_usrevtparser::parse(char* evtstr)
 	m_argnames.clear();
 	m_argvals.clear();
 
-	if(skip_spaces(p, &delta) == false)
+	res = skip_spaces(p, &delta);
+	if(res != sinsp_usrevtparser::RES_OK)
 	{
-		return false;
+		return res;
 	}
 	p += delta;
 
 	if(*(p++) != '[')
 	{
-		return false;
+		return sinsp_usrevtparser::RES_FAILED;
 	}
 
-	if(skip_spaces(p, &delta) == false)
+	res = skip_spaces(p, &delta);
+	if(res != sinsp_usrevtparser::RES_OK)
 	{
-		return false;
-	}
-	p += delta;
-
-	if(parsestr(p, &m_id, &delta) == false)
-	{
-		return false;
+		return res;
 	}
 	p += delta;
 
-	if(skip_spaces_and_commas(p, &delta, 1) == false)
+	res = parsestr(p, &m_id, &delta);
+	if(res != sinsp_usrevtparser::RES_OK)
 	{
-		return false;
+		return res;
+	}
+	p += delta;
+
+	res = skip_spaces_and_commas(p, &delta, 1);
+	if(res != sinsp_usrevtparser::RES_OK)
+	{
+		return res;
 	}
 	p += delta;
 
@@ -2931,132 +2974,156 @@ inline bool sinsp_usrevtparser::parse(char* evtstr)
 	}
 	else
 	{
-		return false;
+		return sinsp_usrevtparser::RES_FAILED;
 	}
 	p++;
 
 	//
 	// First tag
 	//
-	if(skip_spaces_and_commas_and_sq_brakets(p, &delta) == false)
+	res = skip_spaces_and_commas_and_sq_brakets(p, &delta);
+	if(res != sinsp_usrevtparser::RES_OK)
 	{
-		return false;
+		return res;
 	}
 	p += delta;
 
-	if(parsestr(p, &tstr, &delta) == false)
+	res = parsestr_not_enforce(p, &tstr, &delta);
+	if(res != sinsp_usrevtparser::RES_OK)
 	{
-		return false;
+		return res;
 	}
 	p += delta;
-	m_tags.push_back(tstr);
 
-	//
-	// Remaining tags
-	//
-	while(true)
+	if(tstr != NULL)
 	{
-		if(skip_spaces_and_commas(p, &delta, 0) == false)
-		{
-			return false;
-		}
-		p += delta;
-
-		if(*p == ']')
-		{
-			break;
-		}
-
-		if(parsestr(p, &tstr, &delta) == false)
-		{
-			return false;
-		}
-		p += delta;
 		m_tags.push_back(tstr);
+
+		//
+		// Remaining tags
+		//
+		while(true)
+		{
+			res = skip_spaces_and_commas(p, &delta, 0);
+			if(res != sinsp_usrevtparser::RES_OK)
+			{
+				return res;
+			}
+			p += delta;
+
+			if(*p == ']')
+			{
+				break;
+			}
+
+			res = parsestr(p, &tstr, &delta);
+			if(res != sinsp_usrevtparser::RES_OK)
+			{
+				return res;
+			}
+			p += delta;
+			m_tags.push_back(tstr);
+		}
 	}
 
 	//
 	// First argument
 	//
-	if(skip_spaces_and_commas_and_all_brakets(p, &delta) == false)
+	res = skip_spaces_and_commas_and_all_brakets(p, &delta);
+	if(res != sinsp_usrevtparser::RES_OK)
 	{
-		return false;
+		return res;
 	}
 	p += delta;
 
-	if(parsestr(p, &tstr, &delta) == false)
+	res = parsestr_not_enforce(p, &tstr, &delta);
+	if(res != sinsp_usrevtparser::RES_OK)
 	{
-		return false;
+		return res;
 	}
 	p += delta;
-	m_argnames.push_back(tstr);
-
-	if(skip_spaces_and_columns(p, &delta) == false)
+	
+	if(tstr != NULL)
 	{
-		return false;
-	}
-	p += delta;
-
-	if(parsestr(p, &tstr, &delta) == false)
-	{
-		return false;
-	}
-	p += delta;
-	m_argvals.push_back(tstr);
-
-	//
-	// Remaining arguments
-	//
-	while(true)
-	{
-		if(skip_spaces_and_commas_and_cr_brakets(p, &delta) == false)
-		{
-			return false;
-		}
-		p += delta;
-
-		if(*p == ']')
-		{
-			p++;
-			break;
-		}
-
-		if(parsestr(p, &tstr, &delta) == false)
-		{
-			return false;
-		}
-		p += delta;
 		m_argnames.push_back(tstr);
 
-		if(skip_spaces_and_columns(p, &delta) == false)
+		res = skip_spaces_and_columns(p, &delta);
+		if(res != sinsp_usrevtparser::RES_OK)
 		{
-			return false;
+			return res;
 		}
 		p += delta;
 
-		if(parsestr(p, &tstr, &delta) == false)
+		res = parsestr(p, &tstr, &delta);
+		if(res != sinsp_usrevtparser::RES_OK)
 		{
-			return false;
+			return res;
 		}
 		p += delta;
 		m_argvals.push_back(tstr);
+
+		//
+		// Remaining arguments
+		//
+		while(true)
+		{
+			res = skip_spaces_and_commas_and_cr_brakets(p, &delta);
+			if(res != sinsp_usrevtparser::RES_OK)
+			{
+				return res;
+			}
+			p += delta;
+
+			if(*p == ']')
+			{
+				p++;
+				break;
+			}
+
+			res = parsestr(p, &tstr, &delta);
+			if(res != sinsp_usrevtparser::RES_OK)
+			{
+				return res;
+			}
+			p += delta;
+			m_argnames.push_back(tstr);
+
+			res = skip_spaces_and_columns(p, &delta);
+			if(res != sinsp_usrevtparser::RES_OK)
+			{
+				return res;
+			}
+			p += delta;
+
+			res = parsestr(p, &tstr, &delta);
+			if(res != sinsp_usrevtparser::RES_OK)
+			{
+				return res;
+			}
+			p += delta;
+			m_argvals.push_back(tstr);
+		}
 	}
 
-	if(skip_spaces(p, &delta) == false)
+	//
+	// Terminating ]
+	//
+	res = skip_spaces(p, &delta);
+	if(res != sinsp_usrevtparser::RES_OK)
 	{
-		return false;
+		return res;
 	}
 	p += delta;
 
 	if(*p != ']')
 	{
-		return false;
+		return sinsp_usrevtparser::RES_FAILED;
 	}
 
-	return true;
+	return sinsp_usrevtparser::RES_OK;
 }
 
-bool sinsp_usrevtparser::parse_test(char* evtstr)
+sinsp_usrevtparser::parse_result sinsp_usrevtparser::parse_test(char* evtstr)
 {
 	return parse(evtstr);
 }

@@ -26,7 +26,14 @@ class sinsp_fd_listener;
 class sinsp_usrevtparser
 {
 public:
-	inline bool parse(char* evtstr);
+	enum parse_result
+	{
+		RES_OK,
+		RES_FAILED,
+		RES_TRUNCATED,
+	};
+
+	inline parse_result parse(char* evtstr);
 
 	bool m_is_enter;
 	char* m_id;
@@ -35,19 +42,20 @@ public:
 	vector<char*> m_argvals;
 
 VISIBILITY_PRIVATE
-	bool skip_spaces(char* p, uint32_t* delta);
-	bool skip_spaces_and_commas(char* p, uint32_t* delta, uint32_t n_expected_commas);
-	bool skip_spaces_and_columns(char* p, uint32_t* delta);
-	bool skip_spaces_and_commas_and_sq_brakets(char* p, uint32_t* delta);
-	bool skip_spaces_and_commas_and_cr_brakets(char* p, uint32_t* delta);
-	bool skip_spaces_and_commas_and_all_brakets(char* p, uint32_t* delta);
+	parse_result skip_spaces(char* p, uint32_t* delta);
+	parse_result skip_spaces_and_commas(char* p, uint32_t* delta, uint32_t n_expected_commas);
+	parse_result skip_spaces_and_columns(char* p, uint32_t* delta);
+	parse_result skip_spaces_and_commas_and_sq_brakets(char* p, uint32_t* delta);
+	parse_result skip_spaces_and_commas_and_cr_brakets(char* p, uint32_t* delta);
+	parse_result skip_spaces_and_commas_and_all_brakets(char* p, uint32_t* delta);
 
-	bool parsestr(char* p, char** res, uint32_t* delta);
+	parse_result parsestr(char* p, char** res, uint32_t* delta);
+	parse_result parsestr_not_enforce(char* p, char** res, uint32_t* delta);
 
 	//
 	// For testing purposes
 	//
-	bool parse_test(char* evtstr);
+	parse_result parse_test(char* evtstr);
 
 	enum state
 	{
