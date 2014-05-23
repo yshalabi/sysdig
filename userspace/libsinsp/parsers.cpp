@@ -3276,3 +3276,8 @@ void sinsp_usrevtparser::parse_test(char* evtstr, uint32_t evtstrlen)
 {
 	parse(evtstr, evtstrlen);
 }
+
+sinsp_usrevtparser::parse_result sinsp_usrevtparser::process_event_data_test(char *data, uint32_t datalen)
+{
+	return process_event_data(data, datalen);
+}

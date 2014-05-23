@@ -69,6 +69,7 @@ VISIBILITY_PRIVATE
 	// For testing purposes
 	//
 	void parse_test(char* evtstr, uint32_t evtstrlen);
+	sinsp_usrevtparser::parse_result process_event_data_test(char *data, uint32_t datalen);
 
 	string m_storage_str;
 	char* m_storage;
