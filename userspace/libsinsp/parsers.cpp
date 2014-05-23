@@ -3210,7 +3210,7 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::process_event_data(c
 
 	if(m_fragment_size != 0)
 	{
-		m_fullfragment_storage_str = m_storage_str;
+		m_fullfragment_storage_str = m_storage;
 	}
 
 	//
@@ -3224,6 +3224,7 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::process_event_data(c
 		// Invalid syntax
 		//
 		m_fragment_size = 0;
+		m_fullfragment_storage_str.clear();
 		return m_res;
 	}
 	else if(m_res == sinsp_usrevtparser::RES_TRUNCATED)
@@ -3259,13 +3260,14 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::process_event_data(c
 				m_fullfragment_storage_str.c_str(), 
 				tlen);
 
-			m_fragment_size = tlen - 1;
+			m_fragment_size = tlen;
 		}
 		
 		return m_res;
 	}
 
 	m_fragment_size = 0;
+	m_fullfragment_storage_str.clear();
 
 	return sinsp_usrevtparser::RES_OK;
 }
