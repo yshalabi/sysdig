@@ -42,7 +42,8 @@ public:
 
 	sinsp_usrevtparser();
 
-	inline parse_result parse(char* evtstr, uint32_t evtstrlen);
+	void process_event(sinsp_evt *evt, scap_evt* fakeevt);
+	inline void parse(char* evtstr, uint32_t evtstrlen);
 
 	bool m_is_enter;
 	char* m_id;
@@ -51,24 +52,27 @@ public:
 	vector<char*> m_argvals;
 
 VISIBILITY_PRIVATE
-	parse_result skip_spaces(char* p, uint32_t* delta);
-	parse_result skip_spaces_and_commas(char* p, uint32_t* delta, uint32_t n_expected_commas);
-	parse_result skip_spaces_and_columns(char* p, uint32_t* delta);
-	parse_result skip_spaces_and_commas_and_sq_brakets(char* p, uint32_t* delta);
-	parse_result skip_spaces_and_commas_and_cr_brakets(char* p, uint32_t* delta);
-	parse_result skip_spaces_and_commas_and_all_brakets(char* p, uint32_t* delta);
+	inline parse_result skip_spaces(char* p, uint32_t* delta);
+	inline parse_result skip_spaces_and_commas(char* p, uint32_t* delta, uint32_t n_expected_commas);
+	inline parse_result skip_spaces_and_columns(char* p, uint32_t* delta);
+	inline parse_result skip_spaces_and_commas_and_sq_brakets(char* p, uint32_t* delta);
+	inline parse_result skip_spaces_and_commas_and_cr_brakets(char* p, uint32_t* delta);
+	inline parse_result skip_spaces_and_commas_and_all_brakets(char* p, uint32_t* delta);
 
-	parse_result parsestr(char* p, char** res, uint32_t* delta);
-	parse_result parsestr_not_enforce(char* p, char** res, uint32_t* delta);
-	parse_result parsenumber(char* p, char** res, uint32_t* delta);
+	inline parse_result parsestr(char* p, char** res, uint32_t* delta);
+	inline parse_result parsestr_not_enforce(char* p, char** res, uint32_t* delta);
+	inline parse_result parsenumber(char* p, char** res, uint32_t* delta);
+
+	inline void push_fragment(char* evtstr, uint32_t evtstrlen);
 
 	//
 	// For testing purposes
 	//
-	parse_result parse_test(char* evtstr, uint32_t evtstrlen);
+	void parse_test(char* evtstr, uint32_t evtstrlen);
 
 	string m_storage_str;
 	char* m_storage;
+	uint32_t m_fragment_size;
 	sinsp_usrevtparser::parse_result m_res;
 
 	friend class sinsp_parser;
@@ -265,6 +269,7 @@ VISIBILITY_PRIVATE
 	friend class sinsp_thread_manager;
 	friend class sinsp_transaction_table;
 	friend class thread_analyzer_info;
+	friend class sinsp_usrevtparser;
 };
 
 /*@}*/

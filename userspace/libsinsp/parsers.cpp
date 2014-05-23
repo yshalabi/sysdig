@@ -63,14 +63,13 @@ sinsp_parser::sinsp_parser(sinsp *inspector) :
 char doc[] = "[12435, >, [\"mysql\", \"query\", \"init\"], [{\"argname1\":\"argval1\"}, {\"argname2\":\"argval2\"}, {\"argname3\":\"argval3\"}]]";
 //char doc[] = "[12, ";
 sinsp_usrevtparser p;
-sinsp_usrevtparser::parse_result res;
 printf("1\n");
 
 float cpu_time = ((float)clock ()) / CLOCKS_PER_SEC;
 
 for(uint64_t j = 0; j < 10000000; j++)
 {
-	res = p.parse(doc, sizeof(doc));
+	p.parse(doc, sizeof(doc));
 /*
 	char* p = buffer;
 	while(*p != 0)
@@ -78,7 +77,7 @@ for(uint64_t j = 0; j < 10000000; j++)
 		p++;
 	}
 */
-	if(res != sinsp_usrevtparser::RES_OK)
+	if(p.m_res != sinsp_usrevtparser::RES_OK)
 	{
 		printf("ERROR\n");
 	}
@@ -1875,72 +1874,6 @@ void sinsp_parser::swap_ipv4_addresses(sinsp_fdinfo_t* fdinfo)
 	fdinfo->m_sockinfo.m_ipv4info.m_fields.m_dport = tport;
 }
 
-//
-// This function parses a write to /dev/sysdig-events and coverts it into
-// a PPME_USER_* event
-//
-void sinsp_parser::parse_userevt(sinsp_evt *evt)
-{
-	sinsp_evt_param *parinfo;
-	char *data;
-	uint32_t datalen;
-	uint16_t newetype = PPME_USER_E;
-	sinsp_threadinfo* tinfo = evt->m_tinfo;
-
-	if(tinfo == NULL)
-	{
-		return;
-	}
-
-BRK(15073);
-
-	//
-	// Extract the data buffer
-	//
-	parinfo = evt->get_param(1);
-	datalen = parinfo->m_len;
-	data = parinfo->m_val;
-
-	sinsp_usrevtparser::parse_result pres = tinfo->m_userevt_parser.parse(data, datalen);
-
-	if(pres == sinsp_usrevtparser::RES_TRUNCATED)
-	{
-		return;
-	}
-	else if (pres == sinsp_usrevtparser::RES_FAILED)
-	{
-		return;
-	}
-
-	//
-	// Populate the user event that we will send up the stack instead of the write
-	//
-	m_fake_userevt->ts = evt->m_pevt->ts;
-	m_fake_userevt->tid = evt->m_pevt->tid;
-	m_fake_userevt->len = 0;
-	m_fake_userevt->type = newetype;
-	uint16_t *lens = (uint16_t *)(m_fake_userevt_storage + sizeof(struct ppm_evt_hdr));
-	lens[0] = 8;
-	lens[1] = 4;
-
-	*(uint64_t *)(m_fake_userevt_storage + sizeof(struct ppm_evt_hdr) + 4) = 33;
-	*(m_fake_userevt_storage + sizeof(struct ppm_evt_hdr) + 12) = 'A';
-	*(m_fake_userevt_storage + sizeof(struct ppm_evt_hdr) + 13) = 'B';
-	*(m_fake_userevt_storage + sizeof(struct ppm_evt_hdr) + 14) = 'C';
-	*(m_fake_userevt_storage + sizeof(struct ppm_evt_hdr) + 15) = '\0';
-
-	evt->m_pevt = m_fake_userevt;
-	evt->init();
-
-	if(tinfo)
-	{
-		tinfo->m_lastevent_fd = -1;
-		tinfo->m_lastevent_type = newetype;
-		tinfo->m_latency = 0;
-		tinfo->m_last_latency_entertime = 0;
-	}
-}
-
 void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 {
 	sinsp_evt_param *parinfo;
@@ -1949,6 +1882,7 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 	sinsp_evt *enter_evt = &m_tmp_evt;
 	ppm_event_flags eflags = evt->get_flags();
 	sinsp_fdinfo_t* fdinfo = evt->m_fdinfo;
+	sinsp_threadinfo* tinfo = evt->m_tinfo;
 
 	if(!fdinfo)
 	{
@@ -1961,7 +1895,7 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 	//
 	if(fdinfo->m_flags & sinsp_fdinfo_t::FLAGS_IS_USER_EVENT_FD)
 	{
-		parse_userevt(evt);
+		tinfo->m_userevt_parser.process_event(evt, m_fake_userevt);
 	}
 
 	//
@@ -2012,7 +1946,7 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 						if(fdinfo->is_role_none())
 						{
 								fdinfo->set_net_role_by_guessing(m_inspector,
-									evt->m_tinfo,
+									tinfo,
 									fdinfo,
 									true);
 						}
@@ -2052,7 +1986,7 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 
 			if(m_fd_listener)
 			{
-				m_fd_listener->on_read(evt, tid, evt->m_tinfo->m_lastevent_fd, data, (uint32_t)retval, datalen);
+				m_fd_listener->on_read(evt, tid, tinfo->m_lastevent_fd, data, (uint32_t)retval, datalen);
 			}
 		}
 		else
@@ -2089,7 +2023,7 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 						if(fdinfo->is_role_none())
 						{
 								fdinfo->set_net_role_by_guessing(m_inspector,
-									evt->m_tinfo,
+									tinfo,
 									fdinfo,
 									false);
 						}
@@ -2121,7 +2055,7 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 
 			if(m_fd_listener)
 			{
-				m_fd_listener->on_write(evt, tid, evt->m_tinfo->m_lastevent_fd, data, (uint32_t)retval, datalen);
+				m_fd_listener->on_write(evt, tid, tinfo->m_lastevent_fd, data, (uint32_t)retval, datalen);
 			}
 		}
 	}
@@ -2686,6 +2620,7 @@ sinsp_usrevtparser::sinsp_usrevtparser()
 {
 	m_storage = (char*)m_storage_str.c_str();
 	m_res = sinsp_usrevtparser::RES_OK;
+	m_fragment_size = 0;
 }
 
 inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::skip_spaces(char* p, uint32_t* delta)
@@ -2979,7 +2914,7 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parsestr_not_enforce
 	return sinsp_usrevtparser::RES_OK;
 }
 
-inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parse(char* evtstr, uint32_t evtstrlen)
+inline void sinsp_usrevtparser::parse(char* evtstr, uint32_t evtstrlen)
 {
 	char* p;
 	uint32_t delta;
@@ -3012,14 +2947,14 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parse(char* evtstr, 
 	m_res = skip_spaces(p, &delta);
 	if(m_res != sinsp_usrevtparser::RES_OK)
 	{
-		return m_res;
+		return;
 	}
 	p += delta;
 
 	if(*(p++) != '[')
 	{
 	 m_res = sinsp_usrevtparser::RES_FAILED;
-	 return m_res;
+	 return;
 	}
 
 	//
@@ -3028,14 +2963,14 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parse(char* evtstr, 
 	m_res = skip_spaces(p, &delta);
 	if(m_res != sinsp_usrevtparser::RES_OK)
 	{
-		return m_res;
+		return;
 	}
 	p += delta;
 
 	m_res = parsenumber(p, &m_id, &delta);
 	if(m_res > sinsp_usrevtparser::RES_COMMA)
 	{
-		return m_res;
+		return;
 	}
 	p += delta;
 
@@ -3050,7 +2985,7 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parse(char* evtstr, 
 
 	if(m_res != sinsp_usrevtparser::RES_OK)
 	{
-		return m_res;
+		return;
 	}
 	p += delta;
 
@@ -3070,12 +3005,12 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parse(char* evtstr, 
 		if(*p == 0)
 		{
 			m_res = sinsp_usrevtparser::RES_TRUNCATED;
-			return m_res;
+			return;
 		}
 		else
 		{
 			m_res = sinsp_usrevtparser::RES_FAILED;
-			return m_res;
+			return;
 		}
 	}
 	p++;
@@ -3086,14 +3021,14 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parse(char* evtstr, 
 	m_res = skip_spaces_and_commas_and_sq_brakets(p, &delta);
 	if(m_res != sinsp_usrevtparser::RES_OK)
 	{
-		return m_res;
+		return;
 	}
 	p += delta;
 
 	m_res = parsestr_not_enforce(p, &tstr, &delta);
 	if(m_res != sinsp_usrevtparser::RES_OK)
 	{
-		return m_res;
+		return;
 	}
 	p += delta;
 
@@ -3109,7 +3044,7 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parse(char* evtstr, 
 			m_res = skip_spaces_and_commas(p, &delta, 0);
 			if(m_res != sinsp_usrevtparser::RES_OK)
 			{
-				return m_res;
+				return;
 			}
 			p += delta;
 
@@ -3121,7 +3056,7 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parse(char* evtstr, 
 			m_res = parsestr(p, &tstr, &delta);
 			if(m_res != sinsp_usrevtparser::RES_OK)
 			{
-				return m_res;
+				return;
 			}
 			p += delta;
 			m_tags.push_back(tstr);
@@ -3134,14 +3069,14 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parse(char* evtstr, 
 	m_res = skip_spaces_and_commas_and_all_brakets(p, &delta);
 	if(m_res != sinsp_usrevtparser::RES_OK)
 	{
-		return m_res;
+		return;
 	}
 	p += delta;
 
 	m_res = parsestr_not_enforce(p, &tstr, &delta);
 	if(m_res != sinsp_usrevtparser::RES_OK)
 	{
-		return m_res;
+		return;
 	}
 	p += delta;
 	
@@ -3152,14 +3087,14 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parse(char* evtstr, 
 		m_res = skip_spaces_and_columns(p, &delta);
 		if(m_res != sinsp_usrevtparser::RES_OK)
 		{
-			return m_res;
+			return;
 		}
 		p += delta;
 
 		m_res = parsestr(p, &tstr, &delta);
 		if(m_res != sinsp_usrevtparser::RES_OK)
 		{
-			return m_res;
+			return;
 		}
 		p += delta;
 		m_argvals.push_back(tstr);
@@ -3172,7 +3107,7 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parse(char* evtstr, 
 			m_res = skip_spaces_and_commas_and_cr_brakets(p, &delta);
 			if(m_res != sinsp_usrevtparser::RES_OK)
 			{
-				return m_res;
+				return;
 			}
 			p += delta;
 
@@ -3185,7 +3120,7 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parse(char* evtstr, 
 			m_res = parsestr(p, &tstr, &delta);
 			if(m_res != sinsp_usrevtparser::RES_OK)
 			{
-				return m_res;
+				return;
 			}
 			p += delta;
 			m_argnames.push_back(tstr);
@@ -3193,14 +3128,14 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parse(char* evtstr, 
 			m_res = skip_spaces_and_columns(p, &delta);
 			if(m_res != sinsp_usrevtparser::RES_OK)
 			{
-				return m_res;
+				return;
 			}
 			p += delta;
 
 			m_res = parsestr(p, &tstr, &delta);
 			if(m_res != sinsp_usrevtparser::RES_OK)
 			{
-				return m_res;
+				return;
 			}
 			p += delta;
 			m_argvals.push_back(tstr);
@@ -3213,21 +3148,89 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parse(char* evtstr, 
 	m_res = skip_spaces(p, &delta);
 	if(m_res != sinsp_usrevtparser::RES_OK)
 	{
-		return m_res;
+		return;
 	}
 	p += delta;
 
 	if(*p != ']')
 	{
 		m_res = sinsp_usrevtparser::RES_FAILED;
-		return m_res;
+		return;
 	}
 
 	m_res = sinsp_usrevtparser::RES_OK;
-	return m_res;
+	return;
 }
 
-sinsp_usrevtparser::parse_result sinsp_usrevtparser::parse_test(char* evtstr, uint32_t evtstrlen)
+//
+// This function parses a write to /dev/sysdig-events and converts it into
+// a PPME_USER_* event
+//
+void sinsp_usrevtparser::process_event(sinsp_evt *evt, scap_evt* fakeevt)
 {
-	return parse(evtstr, evtstrlen);
+	sinsp_evt_param *parinfo;
+	char *data;
+	uint32_t datalen;
+	uint16_t newetype = PPME_USER_E;
+	sinsp_threadinfo* tinfo = evt->m_tinfo;
+
+	ASSERT(tinfo != NULL);
+
+BRK(15073);
+
+	//
+	// Extract the data buffer
+	//
+	parinfo = evt->get_param(1);
+	datalen = parinfo->m_len;
+	data = parinfo->m_val;
+
+	parse(data, datalen);
+
+	if(m_res >= sinsp_usrevtparser::RES_FAILED)
+	{
+		return;
+	}
+	else if(m_res >= sinsp_usrevtparser::RES_TRUNCATED)
+	{
+		memcpy(m_storage, 
+			data, 
+			datalen);
+		m_storage[datalen] = 0;
+		return;
+	}
+
+	//
+	// Populate the user event that we will send up the stack instead of the write
+	//
+	uint8_t* fakeevt_storage = (uint8_t*)fakeevt;
+	fakeevt->ts = evt->m_pevt->ts;
+	fakeevt->tid = evt->m_pevt->tid;
+	fakeevt->len = 0;
+	fakeevt->type = newetype;
+	uint16_t *lens = (uint16_t *)( + sizeof(struct ppm_evt_hdr));
+	lens[0] = 8;
+	lens[1] = 4;
+
+	*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 4) = 33;
+	*(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 12) = 'A';
+	*(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 13) = 'B';
+	*(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 14) = 'C';
+	*(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 15) = '\0';
+
+	evt->m_pevt = fakeevt;
+	evt->init();
+
+	if(tinfo)
+	{
+		tinfo->m_lastevent_fd = -1;
+		tinfo->m_lastevent_type = newetype;
+		tinfo->m_latency = 0;
+		tinfo->m_last_latency_entertime = 0;
+	}
+}
+
+void sinsp_usrevtparser::parse_test(char* evtstr, uint32_t evtstrlen)
+{
+	parse(evtstr, evtstrlen);
 }
