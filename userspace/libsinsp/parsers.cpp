@@ -61,9 +61,9 @@ sinsp_parser::sinsp_parser(sinsp *inspector) :
 
 
 char doc[] = "[12435, >, [\"mysql\", \"query\", \"init\"], [{\"argname1\":\"argval1\"}, {\"argname2\":\"argval2\"}, {\"argname3\":\"argval3\"}]]";
-char doc1[] = "[12435, >, [\"mysql\", \"q";
-char doc2[] = "uery\", \"init\"], [{\"argname1\":\"argval1\"}, {\"argname";
-char doc3[] = "2\":\"argval2\"}, {\"argname3\":\"argval3\"}]]";
+char doc1[] = "[12435, >, [\"mysql\", \"query\", \"init\"],";
+char doc2[] = " [{\"argname1\":\"argval1\"}, {\"argname2\":\"argval2\"}, ";
+char doc3[] = "{\"argname3\":\"argval3\"}]]";
 //char doc[] = "[12, ";
 sinsp_usrevtparser p;
 printf("1\n");
@@ -72,12 +72,12 @@ float cpu_time = ((float)clock ()) / CLOCKS_PER_SEC;
 
 for(uint64_t j = 0; j < 10000000; j++)
 {
-	p.process_event_data(doc, sizeof(doc) - 1);
-/*
+//	p.process_event_data(doc, sizeof(doc) - 1);
+
 	p.process_event_data(doc1, sizeof(doc1) - 1);
 	p.process_event_data(doc2, sizeof(doc2) - 1);
 	p.process_event_data(doc3, sizeof(doc3) - 1);
-*/
+
 	if(p.m_res != sinsp_usrevtparser::RES_OK)
 	{
 		printf("ERROR\n");
@@ -2829,7 +2829,7 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::skip_spaces_and_comm
 	uint32_t nosb = 0;
 	uint32_t nocb = 0;
 
-	while(*p == ' ' || *p == ',' || *p == '[' || *p == ']' || *p == '{' || *p == '}')
+	while(*p == ' ' || *p == ',' || *p == '[' || *p == ']' || *p == '{' || *p == '}' || (*p == 0))
 	{
 		if(*p == 0)
 		{
@@ -2882,7 +2882,14 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parsestr(char* p, ch
 	if(*p != '"')
 	{
 		*delta = (p - initial + 1);
-		return sinsp_usrevtparser::RES_FAILED;
+		if(*p == 0)
+		{
+			return sinsp_usrevtparser::RES_TRUNCATED;
+		}
+		else
+		{
+			return sinsp_usrevtparser::RES_FAILED;
+		}
 	}
 
 	*res = p + 1;
@@ -2979,8 +2986,8 @@ inline void sinsp_usrevtparser::parse(char* evtstr, uint32_t evtstrlen)
 
 	if(*(p++) != '[')
 	{
-	 m_res = sinsp_usrevtparser::RES_FAILED;
-	 return;
+		m_res = sinsp_usrevtparser::RES_FAILED;
+		return;
 	}
 
 	//
