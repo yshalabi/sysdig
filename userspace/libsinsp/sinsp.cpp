@@ -403,12 +403,12 @@ int32_t sinsp::next(OUT sinsp_evt **evt)
 		remove_thread(m_tid_to_remove);
 		m_tid_to_remove = -1;
 	}
+#endif // HAS_ANALYZER
 
 	//
 	// Run the periodic connection and thread table cleanup
 	//
 	m_thread_manager->remove_inactive_threads();
-#endif // HAS_ANALYZER
 
 	//
 	// Deleayed removal of the fd, so that

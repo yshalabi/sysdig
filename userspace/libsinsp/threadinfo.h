@@ -26,6 +26,54 @@ class sinsp_delays_info;
 class sinsp_threadtable_listener;
 class thread_analyzer_info;
 
+///////////////////////////////////////////////////////////////////////////////
+// user event parser
+///////////////////////////////////////////////////////////////////////////////
+class sinsp_usrevtparser
+{
+public:
+	enum parse_result
+	{
+		RES_OK = 0,
+		RES_COMMA = 1,
+		RES_FAILED = 2,
+		RES_TRUNCATED = 3,
+	};
+
+	sinsp_usrevtparser();
+
+	inline parse_result parse(char* evtstr, uint32_t evtstrlen);
+
+	bool m_is_enter;
+	char* m_id;
+	vector<char*> m_tags;
+	vector<char*> m_argnames;
+	vector<char*> m_argvals;
+
+VISIBILITY_PRIVATE
+	parse_result skip_spaces(char* p, uint32_t* delta);
+	parse_result skip_spaces_and_commas(char* p, uint32_t* delta, uint32_t n_expected_commas);
+	parse_result skip_spaces_and_columns(char* p, uint32_t* delta);
+	parse_result skip_spaces_and_commas_and_sq_brakets(char* p, uint32_t* delta);
+	parse_result skip_spaces_and_commas_and_cr_brakets(char* p, uint32_t* delta);
+	parse_result skip_spaces_and_commas_and_all_brakets(char* p, uint32_t* delta);
+
+	parse_result parsestr(char* p, char** res, uint32_t* delta);
+	parse_result parsestr_not_enforce(char* p, char** res, uint32_t* delta);
+	parse_result parsenumber(char* p, char** res, uint32_t* delta);
+
+	//
+	// For testing purposes
+	//
+	parse_result parse_test(char* evtstr, uint32_t evtstrlen);
+
+	string m_storage_str;
+	char* m_storage;
+	sinsp_usrevtparser::parse_result m_res;
+
+	friend class sinsp_parser;
+};
+
 typedef struct erase_fd_params
 {
 	bool m_remove_from_table;
@@ -154,6 +202,11 @@ public:
 	uint32_t m_vmswap_kb; ///< swapped memory (as kb).
 	uint64_t m_pfmajor; ///< number of major page faults since start.
 	uint64_t m_pfminor; ///< number of minor page faults since start.
+
+	//
+	// Parser for the user events. Public so that filter fields can access it
+	//
+	sinsp_usrevtparser m_userevt_parser;
 
 	thread_analyzer_info* m_ainfo;
 

@@ -60,9 +60,8 @@ sinsp_parser::sinsp_parser(sinsp *inspector) :
 
 
 
-char doc[] = "[\"12435\", >, [\"mysql\", \"query\", \"init\"], [{\"argname1\":\"argval1\"}, {\"argname2\":\"argval2\"}, {\"argname3\":\"argval3\"}]]";
-//char doc[] = "[\"\", <, [\"mysql\"], [{\"argname1\":\"argval1\"}]]";
-char buffer[sizeof(doc)];
+char doc[] = "[12435, >, [\"mysql\", \"query\", \"init\"], [{\"argname1\":\"argval1\"}, {\"argname2\":\"argval2\"}, {\"argname3\":\"argval3\"}]]";
+//char doc[] = "[12, ";
 sinsp_usrevtparser p;
 sinsp_usrevtparser::parse_result res;
 printf("1\n");
@@ -71,8 +70,7 @@ float cpu_time = ((float)clock ()) / CLOCKS_PER_SEC;
 
 for(uint64_t j = 0; j < 10000000; j++)
 {
-	memcpy(buffer, doc, sizeof(doc));
-	res = p.parse(buffer);
+	res = p.parse(doc, sizeof(doc));
 /*
 	char* p = buffer;
 	while(*p != 0)
@@ -201,8 +199,8 @@ void sinsp_parser::process_event(sinsp_evt *evt)
 	case PPME_SOCKET_SENDMSG_E:
 		store_event(evt);
 		break;
-	case PPME_SYSCALL_WRITE_E:
 /*
+	case PPME_SYSCALL_WRITE_E:
 		evt->m_fdinfo = evt->m_tinfo->get_fd(evt->m_tinfo->m_lastevent_fd);
 		if(evt->m_fdinfo)
 		{
@@ -212,8 +210,8 @@ void sinsp_parser::process_event(sinsp_evt *evt)
 				return;
 			}
 		}
-*/
 		break;
+*/
 	case PPME_SYSCALL_READ_X:
 	case PPME_SYSCALL_WRITE_X:
 	case PPME_SOCKET_RECV_X:
@@ -1883,8 +1881,40 @@ void sinsp_parser::swap_ipv4_addresses(sinsp_fdinfo_t* fdinfo)
 //
 void sinsp_parser::parse_userevt(sinsp_evt *evt)
 {
+	sinsp_evt_param *parinfo;
+	char *data;
+	uint32_t datalen;
 	uint16_t newetype = PPME_USER_E;
+	sinsp_threadinfo* tinfo = evt->m_tinfo;
 
+	if(tinfo == NULL)
+	{
+		return;
+	}
+
+BRK(15073);
+
+	//
+	// Extract the data buffer
+	//
+	parinfo = evt->get_param(1);
+	datalen = parinfo->m_len;
+	data = parinfo->m_val;
+
+	sinsp_usrevtparser::parse_result pres = tinfo->m_userevt_parser.parse(data, datalen);
+
+	if(pres == sinsp_usrevtparser::RES_TRUNCATED)
+	{
+		return;
+	}
+	else if (pres == sinsp_usrevtparser::RES_FAILED)
+	{
+		return;
+	}
+
+	//
+	// Populate the user event that we will send up the stack instead of the write
+	//
 	m_fake_userevt->ts = evt->m_pevt->ts;
 	m_fake_userevt->tid = evt->m_pevt->tid;
 	m_fake_userevt->len = 0;
@@ -1902,12 +1932,12 @@ void sinsp_parser::parse_userevt(sinsp_evt *evt)
 	evt->m_pevt = m_fake_userevt;
 	evt->init();
 
-	if(evt->m_tinfo)
+	if(tinfo)
 	{
-		evt->m_tinfo->m_lastevent_fd = -1;
-		evt->m_tinfo->m_lastevent_type = newetype;
-		evt->m_tinfo->m_latency = 0;
-		evt->m_tinfo->m_last_latency_entertime = 0;
+		tinfo->m_lastevent_fd = -1;
+		tinfo->m_lastevent_type = newetype;
+		tinfo->m_latency = 0;
+		tinfo->m_last_latency_entertime = 0;
 	}
 }
 
@@ -1929,12 +1959,10 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 	// User events get into the engine as normal writes, but the FD has a flag to
 	// quickly recognize them.
 	//
-/*
 	if(fdinfo->m_flags & sinsp_fdinfo_t::FLAGS_IS_USER_EVENT_FD)
 	{
 		parse_userevt(evt);
 	}
-*/
 
 	//
 	// Extract the return value
@@ -2654,6 +2682,12 @@ void sinsp_parser::parse_context_switch(sinsp_evt* evt)
 //////////////////////////////////////////////////////////////////////////////
 // sinsp_usrevtparser implementation
 ///////////////////////////////////////////////////////////////////////////////
+sinsp_usrevtparser::sinsp_usrevtparser()
+{
+	m_storage = (char*)m_storage_str.c_str();
+	m_res = sinsp_usrevtparser::RES_OK;
+}
+
 inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::skip_spaces(char* p, uint32_t* delta)
 {
 	char* start = p;
@@ -2898,6 +2932,39 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parsestr(char* p, ch
 	return sinsp_usrevtparser::RES_OK;
 }
 
+inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parsenumber(char* p, char** res, uint32_t* delta)
+{
+	char* start = p;
+	sinsp_usrevtparser::parse_result retval = sinsp_usrevtparser::RES_OK;
+
+	*res = p;
+
+	while(*p >= '0' && *p <= '9')
+	{
+		if(*p == 0)
+		{
+			*delta = (p - start + 1);
+			return sinsp_usrevtparser::RES_TRUNCATED;
+		}
+
+		p++;
+	}
+
+	if(*p == ',')
+	{
+		retval = sinsp_usrevtparser::RES_COMMA;
+	}
+	else if(*p != 0 && *p != ' ')
+	{
+		return sinsp_usrevtparser::RES_FAILED;
+	}
+
+	*p = 0;
+
+	*delta = (p - start + 1);
+	return retval;
+}
+
 inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parsestr_not_enforce(char* p, char** res, uint32_t* delta)
 {
 	if(parsestr(p, res, delta) == sinsp_usrevtparser::RES_FAILED)
@@ -2912,52 +2979,78 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parsestr_not_enforce
 	return sinsp_usrevtparser::RES_OK;
 }
 
-inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parse(char* evtstr)
+inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parse(char* evtstr, uint32_t evtstrlen)
 {
-	char* p = evtstr;
-	m_state = ST_START;
+	char* p;
 	uint32_t delta;
 	char* tstr;
-	sinsp_usrevtparser::parse_result res;
+
+	//
+	// Make sure we have enough space in the buffer and copy the data into it
+	//
+	if(m_storage_str.capacity() < evtstrlen + 1)
+	{
+		m_storage_str.resize(evtstrlen + 1);
+		m_storage = (char*)m_storage_str.c_str();
+	}
+
+	memcpy(m_storage, evtstr, evtstrlen);
+	m_storage[evtstrlen] = 0;
 
 	//
 	// Reset the content
 	//
+	p = m_storage;
 	m_id = NULL;
 	m_tags.clear();
 	m_argnames.clear();
 	m_argvals.clear();
 
-	res = skip_spaces(p, &delta);
-	if(res != sinsp_usrevtparser::RES_OK)
+	//
+	// Skip the initial braket
+	//
+	m_res = skip_spaces(p, &delta);
+	if(m_res != sinsp_usrevtparser::RES_OK)
 	{
-		return res;
+		return m_res;
 	}
 	p += delta;
 
 	if(*(p++) != '[')
 	{
-		return sinsp_usrevtparser::RES_FAILED;
+	 m_res = sinsp_usrevtparser::RES_FAILED;
+	 return m_res;
 	}
 
-	res = skip_spaces(p, &delta);
-	if(res != sinsp_usrevtparser::RES_OK)
+	//
+	// ID
+	//
+	m_res = skip_spaces(p, &delta);
+	if(m_res != sinsp_usrevtparser::RES_OK)
 	{
-		return res;
-	}
-	p += delta;
-
-	res = parsestr(p, &m_id, &delta);
-	if(res != sinsp_usrevtparser::RES_OK)
-	{
-		return res;
+		return m_res;
 	}
 	p += delta;
 
-	res = skip_spaces_and_commas(p, &delta, 1);
-	if(res != sinsp_usrevtparser::RES_OK)
+	m_res = parsenumber(p, &m_id, &delta);
+	if(m_res > sinsp_usrevtparser::RES_COMMA)
 	{
-		return res;
+		return m_res;
+	}
+	p += delta;
+
+	if(m_res == sinsp_usrevtparser::RES_COMMA)
+	{
+		m_res = skip_spaces(p, &delta);
+	}
+	else
+	{
+		m_res = skip_spaces_and_commas(p, &delta, 1);
+	}
+
+	if(m_res != sinsp_usrevtparser::RES_OK)
+	{
+		return m_res;
 	}
 	p += delta;
 
@@ -2974,24 +3067,33 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parse(char* evtstr)
 	}
 	else
 	{
-		return sinsp_usrevtparser::RES_FAILED;
+		if(*p == 0)
+		{
+			m_res = sinsp_usrevtparser::RES_TRUNCATED;
+			return m_res;
+		}
+		else
+		{
+			m_res = sinsp_usrevtparser::RES_FAILED;
+			return m_res;
+		}
 	}
 	p++;
 
 	//
 	// First tag
 	//
-	res = skip_spaces_and_commas_and_sq_brakets(p, &delta);
-	if(res != sinsp_usrevtparser::RES_OK)
+	m_res = skip_spaces_and_commas_and_sq_brakets(p, &delta);
+	if(m_res != sinsp_usrevtparser::RES_OK)
 	{
-		return res;
+		return m_res;
 	}
 	p += delta;
 
-	res = parsestr_not_enforce(p, &tstr, &delta);
-	if(res != sinsp_usrevtparser::RES_OK)
+	m_res = parsestr_not_enforce(p, &tstr, &delta);
+	if(m_res != sinsp_usrevtparser::RES_OK)
 	{
-		return res;
+		return m_res;
 	}
 	p += delta;
 
@@ -3004,10 +3106,10 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parse(char* evtstr)
 		//
 		while(true)
 		{
-			res = skip_spaces_and_commas(p, &delta, 0);
-			if(res != sinsp_usrevtparser::RES_OK)
+			m_res = skip_spaces_and_commas(p, &delta, 0);
+			if(m_res != sinsp_usrevtparser::RES_OK)
 			{
-				return res;
+				return m_res;
 			}
 			p += delta;
 
@@ -3016,10 +3118,10 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parse(char* evtstr)
 				break;
 			}
 
-			res = parsestr(p, &tstr, &delta);
-			if(res != sinsp_usrevtparser::RES_OK)
+			m_res = parsestr(p, &tstr, &delta);
+			if(m_res != sinsp_usrevtparser::RES_OK)
 			{
-				return res;
+				return m_res;
 			}
 			p += delta;
 			m_tags.push_back(tstr);
@@ -3029,17 +3131,17 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parse(char* evtstr)
 	//
 	// First argument
 	//
-	res = skip_spaces_and_commas_and_all_brakets(p, &delta);
-	if(res != sinsp_usrevtparser::RES_OK)
+	m_res = skip_spaces_and_commas_and_all_brakets(p, &delta);
+	if(m_res != sinsp_usrevtparser::RES_OK)
 	{
-		return res;
+		return m_res;
 	}
 	p += delta;
 
-	res = parsestr_not_enforce(p, &tstr, &delta);
-	if(res != sinsp_usrevtparser::RES_OK)
+	m_res = parsestr_not_enforce(p, &tstr, &delta);
+	if(m_res != sinsp_usrevtparser::RES_OK)
 	{
-		return res;
+		return m_res;
 	}
 	p += delta;
 	
@@ -3047,17 +3149,17 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parse(char* evtstr)
 	{
 		m_argnames.push_back(tstr);
 
-		res = skip_spaces_and_columns(p, &delta);
-		if(res != sinsp_usrevtparser::RES_OK)
+		m_res = skip_spaces_and_columns(p, &delta);
+		if(m_res != sinsp_usrevtparser::RES_OK)
 		{
-			return res;
+			return m_res;
 		}
 		p += delta;
 
-		res = parsestr(p, &tstr, &delta);
-		if(res != sinsp_usrevtparser::RES_OK)
+		m_res = parsestr(p, &tstr, &delta);
+		if(m_res != sinsp_usrevtparser::RES_OK)
 		{
-			return res;
+			return m_res;
 		}
 		p += delta;
 		m_argvals.push_back(tstr);
@@ -3067,10 +3169,10 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parse(char* evtstr)
 		//
 		while(true)
 		{
-			res = skip_spaces_and_commas_and_cr_brakets(p, &delta);
-			if(res != sinsp_usrevtparser::RES_OK)
+			m_res = skip_spaces_and_commas_and_cr_brakets(p, &delta);
+			if(m_res != sinsp_usrevtparser::RES_OK)
 			{
-				return res;
+				return m_res;
 			}
 			p += delta;
 
@@ -3080,25 +3182,25 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parse(char* evtstr)
 				break;
 			}
 
-			res = parsestr(p, &tstr, &delta);
-			if(res != sinsp_usrevtparser::RES_OK)
+			m_res = parsestr(p, &tstr, &delta);
+			if(m_res != sinsp_usrevtparser::RES_OK)
 			{
-				return res;
+				return m_res;
 			}
 			p += delta;
 			m_argnames.push_back(tstr);
 
-			res = skip_spaces_and_columns(p, &delta);
-			if(res != sinsp_usrevtparser::RES_OK)
+			m_res = skip_spaces_and_columns(p, &delta);
+			if(m_res != sinsp_usrevtparser::RES_OK)
 			{
-				return res;
+				return m_res;
 			}
 			p += delta;
 
-			res = parsestr(p, &tstr, &delta);
-			if(res != sinsp_usrevtparser::RES_OK)
+			m_res = parsestr(p, &tstr, &delta);
+			if(m_res != sinsp_usrevtparser::RES_OK)
 			{
-				return res;
+				return m_res;
 			}
 			p += delta;
 			m_argvals.push_back(tstr);
@@ -3108,22 +3210,24 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parse(char* evtstr)
 	//
 	// Terminating ]
 	//
-	res = skip_spaces(p, &delta);
-	if(res != sinsp_usrevtparser::RES_OK)
+	m_res = skip_spaces(p, &delta);
+	if(m_res != sinsp_usrevtparser::RES_OK)
 	{
-		return res;
+		return m_res;
 	}
 	p += delta;
 
 	if(*p != ']')
 	{
-		return sinsp_usrevtparser::RES_FAILED;
+		m_res = sinsp_usrevtparser::RES_FAILED;
+		return m_res;
 	}
 
-	return sinsp_usrevtparser::RES_OK;
+	m_res = sinsp_usrevtparser::RES_OK;
+	return m_res;
 }
 
-sinsp_usrevtparser::parse_result sinsp_usrevtparser::parse_test(char* evtstr)
+sinsp_usrevtparser::parse_result sinsp_usrevtparser::parse_test(char* evtstr, uint32_t evtstrlen)
 {
-	return parse(evtstr);
+	return parse(evtstr, evtstrlen);
 }

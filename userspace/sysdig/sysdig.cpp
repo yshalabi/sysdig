@@ -1076,7 +1076,6 @@ exit:
 
 #ifdef _WIN32
 	_CrtDumpMemoryLeaks();
-	Sleep(1000000);
 #endif
 
 	return res;

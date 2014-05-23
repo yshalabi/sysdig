@@ -20,56 +20,6 @@ along with sysdig.  If not, see <http://www.gnu.org/licenses/>.
 
 class sinsp_fd_listener;
 
-///////////////////////////////////////////////////////////////////////////////
-// user event parser
-///////////////////////////////////////////////////////////////////////////////
-class sinsp_usrevtparser
-{
-public:
-	enum parse_result
-	{
-		RES_OK,
-		RES_FAILED,
-		RES_TRUNCATED,
-	};
-
-	inline parse_result parse(char* evtstr);
-
-	bool m_is_enter;
-	char* m_id;
-	vector<char*> m_tags;
-	vector<char*> m_argnames;
-	vector<char*> m_argvals;
-
-VISIBILITY_PRIVATE
-	parse_result skip_spaces(char* p, uint32_t* delta);
-	parse_result skip_spaces_and_commas(char* p, uint32_t* delta, uint32_t n_expected_commas);
-	parse_result skip_spaces_and_columns(char* p, uint32_t* delta);
-	parse_result skip_spaces_and_commas_and_sq_brakets(char* p, uint32_t* delta);
-	parse_result skip_spaces_and_commas_and_cr_brakets(char* p, uint32_t* delta);
-	parse_result skip_spaces_and_commas_and_all_brakets(char* p, uint32_t* delta);
-
-	parse_result parsestr(char* p, char** res, uint32_t* delta);
-	parse_result parsestr_not_enforce(char* p, char** res, uint32_t* delta);
-
-	//
-	// For testing purposes
-	//
-	parse_result parse_test(char* evtstr);
-
-	enum state
-	{
-		ST_START,
-		ST_ID,
-		ST_DIR,
-		ST_TAGS,
-		ST_ARGS,
-		ST_END,
-	};
-
-	state m_state;
-};
-
 ////////////////////////////////////////////////////////////////////////////
 // Event parser class
 ////////////////////////////////////////////////////////////////////////////
@@ -95,10 +45,6 @@ public:
 	//
 	static void parse_openat_dir(sinsp_evt *evt, char* name, int64_t dirfd, OUT string* sdir);
 
-	//
-	// Parser for the user events. Public so that filter fields can access it
-	//
-	sinsp_usrevtparser m_userevt_parser;
 private:
 	//
 	// Helpers
