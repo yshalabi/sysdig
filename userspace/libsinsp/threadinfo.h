@@ -42,7 +42,7 @@ public:
 
 	sinsp_usrevtparser();
 
-	void process_event(sinsp_evt *evt, scap_evt* fakeevt);
+	inline sinsp_usrevtparser::parse_result process_event_data(char *data, uint32_t datalen);
 	inline void parse(char* evtstr, uint32_t evtstrlen);
 
 	bool m_is_enter;
@@ -74,6 +74,7 @@ VISIBILITY_PRIVATE
 	char* m_storage;
 	uint32_t m_fragment_size;
 	sinsp_usrevtparser::parse_result m_res;
+	string m_fullfragment_storage_str;
 
 	friend class sinsp_parser;
 };

@@ -81,6 +81,11 @@ along with sysdig.  If not, see <http://www.gnu.org/licenses/>.
 #define DEFAULT_SNAPLEN 80
 
 //
+// Maximum user event buffer size
+//
+#define MAX_USER_EVT_BUFFER 65536
+
+//
 // FD class customized with the storage we need
 //
 #ifdef HAS_ANALYZER

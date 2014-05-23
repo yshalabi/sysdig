@@ -61,6 +61,9 @@ sinsp_parser::sinsp_parser(sinsp *inspector) :
 
 
 char doc[] = "[12435, >, [\"mysql\", \"query\", \"init\"], [{\"argname1\":\"argval1\"}, {\"argname2\":\"argval2\"}, {\"argname3\":\"argval3\"}]]";
+char doc1[] = "[12435, >, [\"mysql\", \"q";
+char doc2[] = "uery\", \"init\"], [{\"argname1\":\"argval1\"}, {\"argname";
+char doc3[] = "2\":\"argval2\"}, {\"argname3\":\"argval3\"}]]";
 //char doc[] = "[12, ";
 sinsp_usrevtparser p;
 printf("1\n");
@@ -69,13 +72,11 @@ float cpu_time = ((float)clock ()) / CLOCKS_PER_SEC;
 
 for(uint64_t j = 0; j < 10000000; j++)
 {
-	p.parse(doc, sizeof(doc));
+	p.process_event_data(doc, sizeof(doc) - 1);
 /*
-	char* p = buffer;
-	while(*p != 0)
-	{
-		p++;
-	}
+	p.process_event_data(doc1, sizeof(doc1) - 1);
+	p.process_event_data(doc2, sizeof(doc2) - 1);
+	p.process_event_data(doc3, sizeof(doc3) - 1);
 */
 	if(p.m_res != sinsp_usrevtparser::RES_OK)
 	{
@@ -1895,7 +1896,43 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 	//
 	if(fdinfo->m_flags & sinsp_fdinfo_t::FLAGS_IS_USER_EVENT_FD)
 	{
-		tinfo->m_userevt_parser.process_event(evt, m_fake_userevt);
+		//
+		// Extract the data buffer
+		//
+		sinsp_evt_param *parinfo = evt->get_param(1);
+		char* data = parinfo->m_val;
+		uint32_t datalen = parinfo->m_len;
+
+		tinfo->m_userevt_parser.process_event_data(data, datalen);
+
+		//
+		// Populate the user event that we will send up the stack instead of the write
+		//
+		uint8_t* fakeevt_storage = (uint8_t*)m_fake_userevt;
+		m_fake_userevt->ts = evt->m_pevt->ts;
+		m_fake_userevt->tid = evt->m_pevt->tid;
+		m_fake_userevt->len = 0;
+		m_fake_userevt->type = PPME_USER_E;
+		uint16_t *lens = (uint16_t *)( + sizeof(struct ppm_evt_hdr));
+		lens[0] = 8;
+		lens[1] = 4;
+
+		*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 4) = 33;
+		*(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 12) = 'A';
+		*(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 13) = 'B';
+		*(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 14) = 'C';
+		*(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 15) = '\0';
+
+		evt->m_pevt = m_fake_userevt;
+		evt->init();
+
+		//
+		// Update some thread information
+		//
+		tinfo->m_lastevent_fd = -1;
+		tinfo->m_lastevent_type = PPME_USER_E;
+		tinfo->m_latency = 0;
+		tinfo->m_last_latency_entertime = 0;
 	}
 
 	//
@@ -2618,7 +2655,8 @@ void sinsp_parser::parse_context_switch(sinsp_evt* evt)
 ///////////////////////////////////////////////////////////////////////////////
 sinsp_usrevtparser::sinsp_usrevtparser()
 {
-	m_storage = (char*)m_storage_str.c_str();
+	m_storage = NULL;
+	m_storage_str.resize(2);
 	m_res = sinsp_usrevtparser::RES_OK;
 	m_fragment_size = 0;
 }
@@ -2921,18 +2959,6 @@ inline void sinsp_usrevtparser::parse(char* evtstr, uint32_t evtstrlen)
 	char* tstr;
 
 	//
-	// Make sure we have enough space in the buffer and copy the data into it
-	//
-	if(m_storage_str.capacity() < evtstrlen + 1)
-	{
-		m_storage_str.resize(evtstrlen + 1);
-		m_storage = (char*)m_storage_str.c_str();
-	}
-
-	memcpy(m_storage, evtstr, evtstrlen);
-	m_storage[evtstrlen] = 0;
-
-	//
 	// Reset the content
 	//
 	p = m_storage;
@@ -3166,68 +3192,82 @@ inline void sinsp_usrevtparser::parse(char* evtstr, uint32_t evtstrlen)
 // This function parses a write to /dev/sysdig-events and converts it into
 // a PPME_USER_* event
 //
-void sinsp_usrevtparser::process_event(sinsp_evt *evt, scap_evt* fakeevt)
+inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::process_event_data(char *data, uint32_t datalen)
 {
-	sinsp_evt_param *parinfo;
-	char *data;
-	uint32_t datalen;
-	uint16_t newetype = PPME_USER_E;
-	sinsp_threadinfo* tinfo = evt->m_tinfo;
-
-	ASSERT(tinfo != NULL);
-
-BRK(15073);
+	ASSERT(data != NULL);
 
 	//
-	// Extract the data buffer
+	// Make sure we have enough space in the buffer and copy the data into it
 	//
-	parinfo = evt->get_param(1);
-	datalen = parinfo->m_len;
-	data = parinfo->m_val;
-
-	parse(data, datalen);
-
-	if(m_res >= sinsp_usrevtparser::RES_FAILED)
+	if(m_storage_str.capacity() < m_fragment_size + datalen + 1 || m_storage == NULL)
 	{
-		return;
+		m_storage_str.resize(m_fragment_size + datalen + 1);
+		m_storage = (char*)m_storage_str.c_str();
 	}
-	else if(m_res >= sinsp_usrevtparser::RES_TRUNCATED)
+
+	memcpy(m_storage + m_fragment_size, data, datalen);
+	m_storage[m_fragment_size + datalen] = 0;
+
+	if(m_fragment_size != 0)
 	{
-		memcpy(m_storage, 
-			data, 
-			datalen);
-		m_storage[datalen] = 0;
-		return;
+		m_fullfragment_storage_str = m_storage_str;
 	}
 
 	//
-	// Populate the user event that we will send up the stack instead of the write
+	// Do the parsing
 	//
-	uint8_t* fakeevt_storage = (uint8_t*)fakeevt;
-	fakeevt->ts = evt->m_pevt->ts;
-	fakeevt->tid = evt->m_pevt->tid;
-	fakeevt->len = 0;
-	fakeevt->type = newetype;
-	uint16_t *lens = (uint16_t *)( + sizeof(struct ppm_evt_hdr));
-	lens[0] = 8;
-	lens[1] = 4;
+	parse(m_storage, m_fragment_size + datalen);
 
-	*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 4) = 33;
-	*(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 12) = 'A';
-	*(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 13) = 'B';
-	*(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 14) = 'C';
-	*(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 15) = '\0';
-
-	evt->m_pevt = fakeevt;
-	evt->init();
-
-	if(tinfo)
+	if(m_res == sinsp_usrevtparser::RES_FAILED)
 	{
-		tinfo->m_lastevent_fd = -1;
-		tinfo->m_lastevent_type = newetype;
-		tinfo->m_latency = 0;
-		tinfo->m_last_latency_entertime = 0;
+		//
+		// Invalid syntax
+		//
+		m_fragment_size = 0;
+		return m_res;
 	}
+	else if(m_res == sinsp_usrevtparser::RES_TRUNCATED)
+	{
+		//
+		// Valid syntax, but the message is incomplete. Buffer it and wait for
+		// more fragments.
+		//
+
+		if(m_fragment_size > MAX_USER_EVT_BUFFER)
+		{
+			//
+			// Maximum buffering size reached, drop the event
+			//
+			m_fragment_size = 0;
+			return m_res;
+		}
+
+		if(m_fullfragment_storage_str.length() == 0)
+		{
+			memcpy(m_storage, 
+				data, 
+				datalen);
+
+			m_storage[datalen] = 0;
+			m_fragment_size += datalen;
+		}
+		else
+		{
+			uint32_t tlen = m_fullfragment_storage_str.length();
+
+			memcpy(m_storage, 
+				m_fullfragment_storage_str.c_str(), 
+				tlen);
+
+			m_fragment_size = tlen - 1;
+		}
+		
+		return m_res;
+	}
+
+	m_fragment_size = 0;
+
+	return sinsp_usrevtparser::RES_OK;
 }
 
 void sinsp_usrevtparser::parse_test(char* evtstr, uint32_t evtstrlen)
