@@ -1155,11 +1155,30 @@ const char* sinsp_evt::get_param_as_str(uint32_t id, OUT const char** resolved_s
 
 			break;
 		}
-	case PT_ABSTIME:
-		//
-		// XXX not implemented yet
-		//
-		ASSERT(false);
+	case PT_CHARBUFARRAY:
+		{
+			ASSERT(param->m_len == sizeof(uint64_t));
+			vector<char*>* args = (vector<char*>*)*(uint64_t *)param->m_val;
+			vector<char*>::iterator it;
+
+			for(it = args->begin(); it != args->end(); ++it)
+			{
+				char* src = *it;
+				char* dst = &m_paramstr_storage[0];
+				char* dstend = &m_paramstr_storage[0] + m_paramstr_storage.size() - 1;
+
+				while(*src != 0 && dst < dstend)
+				{
+					*dst++ = *src++;
+				}
+			}
+
+			//if(param->m_len > m_paramstr_storage.size())
+			//{
+			//	m_paramstr_storage.resize(param->m_len);
+			//}
+		}
+		break;
 	default:
 		ASSERT(false);
 		snprintf(&m_paramstr_storage[0],

@@ -176,6 +176,6 @@ const struct ppm_event_info g_event_info[PPM_EVENT_MAX] = {
 	/* PPME_SYSCALL_FCNTL_X */{"fcntl", EC_IO_OTHER, (enum ppm_event_flags)(EF_USES_FD | EF_MODIFIES_STATE), 1, {{"res", PT_FD, PF_DEC} } },
 	/* PPME_SCHEDSWITCHEX_E */{"switch", EC_SCHEDULER, EF_NONE, 6, {{"next", PT_PID, PF_DEC}, {"pgft_maj", PT_UINT64, PF_DEC}, {"pgft_min", PT_UINT64, PF_DEC}, {"vm_size", PT_UINT32, PF_DEC}, {"vm_rss", PT_UINT32, PF_DEC}, {"vm_swap", PT_UINT32, PF_DEC} } },
 	/* PPME_SCHEDSWITCHEX_X */{"NA2", EC_SCHEDULER, EF_UNUSED, 0},
-	/* PPME_USER_E */{"user", EC_OTHER, EF_NONE, 2, {{"id", PT_UINT64, PF_DEC}, {"info", PT_CHARBUF, PF_NA} } },
+	/* PPME_USER_E */{"user", EC_OTHER, EF_NONE, 2, {{"id", PT_UINT64, PF_DEC}, {"tags", PT_CHARBUFARRAY, PF_NA}, {"args", PT_CHARBUF_PAIR_ARRAY, PF_NA} } },
 	/* PPME_USER_X */{"user", EC_OTHER, EF_NONE, 1, {{"id", PT_UINT64, PF_DEC} } },
 };

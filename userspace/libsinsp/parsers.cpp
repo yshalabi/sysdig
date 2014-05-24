@@ -74,7 +74,7 @@ float cpu_time = ((float)clock ()) / CLOCKS_PER_SEC;
 for(uint64_t j = 0; j < 10000000; j++)
 {
 //	p.process_event_data(doc, sizeof(doc) - 1);
-
+/*
 int pi = sizeof(doc);
 
 	uint32_t k;
@@ -94,24 +94,13 @@ int pi = sizeof(doc);
 	p.process_event_data(doc1, sizeof(doc1) - 1);
 	p.process_event_data(doc2, sizeof(doc2) - 1);
 	p.process_event_data(doc3, sizeof(doc3) - 1);
+*/
+	p.process_event_data(doc, sizeof(doc) - 1);
 
 	if(p.m_res != sinsp_usrevtparser::RES_OK)
 	{
 		printf("ERROR\n");
 	}
-}
-printf("2 %s %s\n", (p.m_is_enter)?"enter":"exit", p.m_id);
-for(uint64_t j = 0; j < p.m_tags.size(); j++)
-{
-	printf("*%s\n", p.m_tags[j]);
-}
-for(uint64_t j = 0; j < p.m_argnames.size(); j++)
-{
-	printf("!%s\n", p.m_argnames[j]);
-}
-for(uint64_t j = 0; j < p.m_argvals.size(); j++)
-{
-	printf("#%s\n", p.m_argvals[j]);
 }
 cpu_time = ((float)clock()/ CLOCKS_PER_SEC) - cpu_time;
 printf ("tempo: %5.2f\n", cpu_time);
@@ -1919,8 +1908,16 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 		sinsp_evt_param *parinfo = evt->get_param(1);
 		char* data = parinfo->m_val;
 		uint32_t datalen = parinfo->m_len;
+		sinsp_usrevtparser* p = &tinfo->m_userevt_parser;
 
-		tinfo->m_userevt_parser.process_event_data(data, datalen);
+		p->process_event_data(data, datalen);
+		if(p->m_res != sinsp_usrevtparser::RES_OK)
+		{
+			return;
+		}
+
+		p->m_args.first = &p->m_argnames;
+		p->m_args.second = &p->m_argvals;
 
 		//
 		// Populate the user event that we will send up the stack instead of the write
@@ -1929,16 +1926,24 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 		m_fake_userevt->ts = evt->m_pevt->ts;
 		m_fake_userevt->tid = evt->m_pevt->tid;
 		m_fake_userevt->len = 0;
-		m_fake_userevt->type = PPME_USER_E;
-		uint16_t *lens = (uint16_t *)( + sizeof(struct ppm_evt_hdr));
-		lens[0] = 8;
-		lens[1] = 4;
 
-		*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 4) = 33;
-		*(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 12) = 'A';
-		*(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 13) = 'B';
-		*(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 14) = 'C';
-		*(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 15) = '\0';
+		if(p->m_is_enter)
+		{
+			m_fake_userevt->type = PPME_USER_E;
+		}
+		else
+		{
+			m_fake_userevt->type = PPME_USER_X;
+		}
+
+		uint16_t *lens = (uint16_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr));
+		lens[0] = 8;
+		lens[1] = 8;
+		lens[2] = 8;
+
+		*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 4) = p->m_id;
+		*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 12) = (uint64_t)&p->m_tags;
+		*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 20) = (uint64_t)&p->m_args;
 
 		evt->m_pevt = m_fake_userevt;
 		evt->init();
@@ -2937,15 +2942,15 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parsestr(char* p, ch
 	return sinsp_usrevtparser::RES_OK;
 }
 
-inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parsenumber(char* p, char** res, uint32_t* delta)
+inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parsenumber(char* p, uint64_t* res, uint32_t* delta)
 {
 	char* start = p;
 	sinsp_usrevtparser::parse_result retval = sinsp_usrevtparser::RES_OK;
-
-	*res = p;
+	uint64_t val = 0;
 
 	while(*p >= '0' && *p <= '9')
 	{
+		val = val * 10 + (*p - '0');
 		p++;
 	}
 
@@ -2965,6 +2970,7 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parsenumber(char* p,
 
 	*p = 0;
 
+	*res = val;
 	*delta = (p - start + 1);
 	return retval;
 }

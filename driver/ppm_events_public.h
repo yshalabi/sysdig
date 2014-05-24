@@ -815,12 +815,14 @@ enum ppm_param_type {
 	PT_FLAGS8 = 28, /* this is an UINT8, but will be interpreted as 8 bit flags. */
 	PT_FLAGS16 = 29, /* this is an UINT16, but will be interpreted as 16 bit flags. */
 	PT_FLAGS32 = 30, /* this is an UINT32, but will be interpreted as 32 bit flags. */
+	PT_CHARBUFARRAY = 31,	/* Pointer to an array of strings, exported by the user events decoder. 64bit. */
+	PT_CHARBUF_PAIR_ARRAY = 32,	/* Pointer to an array of string pairs, exported by the user events decoder. 64bit. */
 };
 
 enum ppm_print_format {
 	PF_NA = 0,
 	PF_DEC = 1,	/* decimal */
-	PF_HEX = 2,	/* hexadecima */
+	PF_HEX = 2,	/* hexadecimal */
 	PF_10_PADDED_DEC = 3, /* decimal padded to 10 digits, useful to print the fractional part of a ns timestamp */
 };
 
