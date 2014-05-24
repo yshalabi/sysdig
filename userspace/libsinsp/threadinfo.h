@@ -41,6 +41,7 @@ public:
 	};
 
 	sinsp_usrevtparser();
+	~sinsp_usrevtparser();
 
 	inline sinsp_usrevtparser::parse_result process_event_data(char *data, uint32_t datalen);
 	inline void parse(char* evtstr, uint32_t evtstrlen);
@@ -71,8 +72,8 @@ VISIBILITY_PRIVATE
 	void parse_test(char* evtstr, uint32_t evtstrlen);
 	sinsp_usrevtparser::parse_result process_event_data_test(char *data, uint32_t datalen);
 
-	string m_storage_str;
 	char* m_storage;
+	uint32_t m_storage_size;
 	uint32_t m_fragment_size;
 	sinsp_usrevtparser::parse_result m_res;
 	string m_fullfragment_storage_str;

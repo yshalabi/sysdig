@@ -44,7 +44,7 @@ along with sysdig.  If not, see <http://www.gnu.org/licenses/>.
 bool should_drop(sinsp_evt *evt);
 #endif
 
-#if 1
+#if 0
 #include <time.h>
 
 sinsp_parser::sinsp_parser(sinsp *inspector) :
@@ -61,10 +61,11 @@ sinsp_parser::sinsp_parser(sinsp *inspector) :
 
 
 char doc[] = "[12435, >, [\"mysql\", \"query\", \"init\"], [{\"argname1\":\"argval1\"}, {\"argname2\":\"argval2\"}, {\"argname3\":\"argval3\"}]]";
-char doc1[] = "[12435, >, [\"mysql\", \"query\", \"init\"],";
-char doc2[] = " [{\"argname1\":\"argval1\"}, {\"argname2\":\"argval2\"}, ";
-char doc3[] = "{\"argname3\":\"argval3\"}]]";
-//char doc[] = "[12, ";
+char doc1[] = "";
+char doc2[] = "[1243";
+char doc3[] = "5, >, [\"mysql\", \"query\", \"init\"], [{\"argname1\":\"argval1\"}, {\"argname2\":\"argval2\"}, {\"argname3\":\"argval3\"}]]";
+char tb[2];
+tb[1] = 0;
 sinsp_usrevtparser p;
 printf("1\n");
 
@@ -73,6 +74,22 @@ float cpu_time = ((float)clock ()) / CLOCKS_PER_SEC;
 for(uint64_t j = 0; j < 10000000; j++)
 {
 //	p.process_event_data(doc, sizeof(doc) - 1);
+
+int pi = sizeof(doc);
+
+	uint32_t k;
+	for(k = 0; k < sizeof(doc) - 2; k++)
+	{
+		tb[0] = doc[k];
+		p.process_event_data_test(tb, 1);
+		if(p.m_res != sinsp_usrevtparser::RES_TRUNCATED)
+		{
+			int a = 0;
+		}
+	}
+
+	tb[0] = doc[k++];
+	p.process_event_data_test(tb, 1);
 
 	p.process_event_data(doc1, sizeof(doc1) - 1);
 	p.process_event_data(doc2, sizeof(doc2) - 1);
@@ -2655,10 +2672,18 @@ void sinsp_parser::parse_context_switch(sinsp_evt* evt)
 ///////////////////////////////////////////////////////////////////////////////
 sinsp_usrevtparser::sinsp_usrevtparser()
 {
+	m_storage_size = 0;
 	m_storage = NULL;
-	m_storage_str.resize(2);
 	m_res = sinsp_usrevtparser::RES_OK;
 	m_fragment_size = 0;
+}
+
+sinsp_usrevtparser::~sinsp_usrevtparser()
+{
+	if(m_storage)
+	{
+		free(m_storage);
+	}
 }
 
 inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::skip_spaces(char* p, uint32_t* delta)
@@ -2721,7 +2746,7 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::skip_spaces_and_colu
 	char* start = p;
 	uint32_t nc = 0;
 
-	while(*p == ' ' || *p == ':')
+	while(*p == ' ' || *p == ':' || *p == 0)
 	{
 		if(*p == 0)
 		{
@@ -2750,7 +2775,7 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::skip_spaces_and_comm
 	uint32_t nc = 0;
 	uint32_t nosb = 0;
 
-	while(*p == ' ' || *p == ',' || *p == '[' || *p == ']')
+	while(*p == ' ' || *p == ',' || *p == '[' || *p == ']' || *p == 0)
 	{
 		if(*p == 0)
 		{
@@ -2791,7 +2816,7 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::skip_spaces_and_comm
 	uint32_t nocb = 0;
 	uint32_t nccb = 0;
 
-	while(*p == ' ' || *p == ',' || *p == '{' || *p == '}')
+	while(*p == ' ' || *p == ',' || *p == '{' || *p == '}' || *p == 0)
 	{
 		if(*p == 0)
 		{
@@ -2921,12 +2946,6 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parsenumber(char* p,
 
 	while(*p >= '0' && *p <= '9')
 	{
-		if(*p == 0)
-		{
-			*delta = (p - start + 1);
-			return sinsp_usrevtparser::RES_TRUNCATED;
-		}
-
 		p++;
 	}
 
@@ -2938,6 +2957,11 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parsenumber(char* p,
 	{
 		return sinsp_usrevtparser::RES_FAILED;
 	}
+	else if(*p == 0)
+	{
+		return sinsp_usrevtparser::RES_TRUNCATED;
+	}
+
 
 	*p = 0;
 
@@ -2947,13 +2971,19 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parsenumber(char* p,
 
 inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parsestr_not_enforce(char* p, char** res, uint32_t* delta)
 {
-	if(parsestr(p, res, delta) == sinsp_usrevtparser::RES_FAILED)
+	sinsp_usrevtparser::parse_result psres = parsestr(p, res, delta);
+
+	if(psres == sinsp_usrevtparser::RES_FAILED)
 	{
 		if(*(p + *delta) == ']')
 		{
 			*res = NULL;
 			return sinsp_usrevtparser::RES_OK;
 		}
+	}
+	else if(psres == sinsp_usrevtparser::RES_TRUNCATED)
+	{
+		return psres;
 	}
 
 	return sinsp_usrevtparser::RES_OK;
@@ -3187,7 +3217,14 @@ inline void sinsp_usrevtparser::parse(char* evtstr, uint32_t evtstrlen)
 
 	if(*p != ']')
 	{
-		m_res = sinsp_usrevtparser::RES_FAILED;
+		if(*p == 0)
+		{
+			m_res = sinsp_usrevtparser::RES_TRUNCATED;
+		}
+		else
+		{
+			m_res = sinsp_usrevtparser::RES_FAILED;
+		}
 		return;
 	}
 
@@ -3206,10 +3243,14 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::process_event_data(c
 	//
 	// Make sure we have enough space in the buffer and copy the data into it
 	//
-	if(m_storage_str.capacity() < m_fragment_size + datalen + 1 || m_storage == NULL)
+	if(m_storage_size < m_fragment_size + datalen + 1)
 	{
-		m_storage_str.resize(m_fragment_size + datalen + 1);
-		m_storage = (char*)m_storage_str.c_str();
+		m_storage = (char*)realloc(m_storage, m_fragment_size + datalen + 1);
+		if(m_storage == NULL)
+		{
+			throw sinsp_exception("memory allocation error in sinsp_usrevtparser::process_event_data.");
+		}
+		m_storage_size = m_fragment_size + datalen + 1;
 	}
 
 	memcpy(m_storage + m_fragment_size, data, datalen);
