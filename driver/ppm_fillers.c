@@ -522,6 +522,7 @@ static int f_sys_write_x(struct event_filler_arguments *args)
 	int64_t retval;
 	unsigned long bufsize;
 	unsigned int snaplen;
+	bool is_user_evt = false;
 
 	/*
 	 * If the write event is directed to our sysdig-events device, we use a
@@ -540,9 +541,9 @@ static int f_sys_write_x(struct event_filler_arguments *args)
 		f = fdget(fd);
 
 		if (f.file && f.file->f_op) {
-			if (THIS_MODULE == f.file->f_op->owner) {
-				snaplen = RW_SNAPLEN_EVENT;
-			}
+			if (THIS_MODULE == f.file->f_op->owner)
+				is_user_evt = true;
+
 			fdput(f);
 		}
 #else
@@ -554,9 +555,9 @@ static int f_sys_write_x(struct event_filler_arguments *args)
 
 		file = fget(fd);
 		if (file && file->f_op) {
-			if (THIS_MODULE == file->f_op->owner) {
-				snaplen = RW_SNAPLEN_EVENT;
-			}
+			if (THIS_MODULE == file->f_op->owner)
+				is_user_evt = true;
+
 			fput(file);
 		}		
 #endif
@@ -565,10 +566,16 @@ static int f_sys_write_x(struct event_filler_arguments *args)
 	/*
 	 * res
 	 */
- 	retval = (int64_t)(long)syscall_get_return_value(current, args->regs);
- 	res = val_to_ring(args, retval, 0, false);
- 	if (unlikely(res != PPM_SUCCESS))
- 		return res;	 	
+	if (is_user_evt) {
+		snaplen = RW_SNAPLEN_EVENT;
+		retval = PPM_USERVET_MAGIC;
+	} else {
+		retval = (int64_t)(long)syscall_get_return_value(current, args->regs);
+	}
+
+	res = val_to_ring(args, retval, 0, false);
+	if (unlikely(res != PPM_SUCCESS))
+		return res;	 	
 
 	/*
 	 * data
