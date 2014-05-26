@@ -476,7 +476,9 @@ int32_t sinsp::next(OUT sinsp_evt **evt)
 	//
 	if(NULL != m_dumper)
 	{
-		res = scap_dump(m_h, m_dumper, m_evt.m_pevt, m_evt.m_cpuid);
+		scap_evt* pdevt = (m_evt.m_poriginal_evt)? m_evt.m_poriginal_evt : m_evt.m_pevt;
+
+		res = scap_dump(m_h, m_dumper, pdevt, m_evt.m_cpuid);
 		if(SCAP_SUCCESS != res)
 		{
 			throw sinsp_exception(scap_getlasterr(m_h));

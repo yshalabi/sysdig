@@ -93,6 +93,7 @@ void sinsp_evt::init()
 	m_tinfo = NULL;
 	m_fdinfo = NULL;
 	m_iosize = 0;
+	m_poriginal_evt = NULL;
 }
 
 void sinsp_evt::init(uint8_t *evdata, uint16_t cpuid)

@@ -64,8 +64,10 @@ void sinsp_dumper::dump(sinsp_evt* evt)
 		throw sinsp_exception("dumper not opened yet");
 	}
 
+	scap_evt* pdevt = (evt->m_poriginal_evt)? evt->m_poriginal_evt : evt->m_pevt;
+
 	int32_t res = scap_dump(m_inspector->m_h, 
-		m_dumper, evt->m_pevt, evt->m_cpuid);
+		m_dumper, pdevt, evt->m_cpuid);
 
 	if(res != SCAP_SUCCESS)
 	{
