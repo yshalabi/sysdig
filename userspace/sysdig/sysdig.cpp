@@ -520,10 +520,19 @@ captureinfo do_inspect(sinsp* inspector,
 				continue;
 			}
 
+			//
+			// The parsing engine can set this flag for some events (e.g. writes
+			// that contain user events)
+			//
+			if(ev->get_filter_flag() == sinsp_evt::FF_FILTER_DONT_DISPLAY)
+			{
+				continue;
+			}
+
 			if(formatter->tostring(ev, &line))
 			{
 				//
-				// Output the line
+				// If there's a display filter, not it's time to run it
 				//
 				if(display_filter)
 				{
@@ -533,6 +542,9 @@ captureinfo do_inspect(sinsp* inspector,
 					}
 				}
 
+				//
+				// Output the line
+				//
 				cout << line << endl;
 			}
 		}

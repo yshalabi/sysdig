@@ -211,7 +211,7 @@ void sinsp_parser::process_event(sinsp_evt *evt)
 		{
 			if(evt->m_fdinfo->m_flags & sinsp_fdinfo_t::FLAGS_IS_USER_EVENT_FD)
 			{
-				evt->m_flt_flag = sinsp_evt::FF_FILTER_OUT;
+				evt->m_flt_flag = sinsp_evt::FF_FILTER_DONT_DISPLAY;
 				return;
 			}
 		}
@@ -1924,7 +1924,6 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 		uint8_t* fakeevt_storage = (uint8_t*)m_fake_userevt;
 		m_fake_userevt->ts = evt->m_pevt->ts;
 		m_fake_userevt->tid = evt->m_pevt->tid;
-		m_fake_userevt->len = 0;
 
 		if(p->m_is_enter)
 		{
@@ -1949,9 +1948,10 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 			*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 2) = p->m_id;
 		}
 
+		scap_evt* tevt = evt->m_pevt;
 		evt->m_pevt = m_fake_userevt;
 		evt->init();
-		evt->m_poriginal_evt = evt->m_pevt;
+		evt->m_poriginal_evt = tevt;
 
 		//
 		// Update some thread information
