@@ -1158,25 +1158,130 @@ const char* sinsp_evt::get_param_as_str(uint32_t id, OUT const char** resolved_s
 	case PT_CHARBUFARRAY:
 		{
 			ASSERT(param->m_len == sizeof(uint64_t));
-			vector<char*>* args = (vector<char*>*)*(uint64_t *)param->m_val;
-			vector<char*>::iterator it;
+			vector<char*>* strings = (vector<char*>*)*(uint64_t *)param->m_val;
 
-			for(it = args->begin(); it != args->end(); ++it)
+			while(true)
 			{
-				char* src = *it;
+				vector<char*>::iterator it;
+				vector<char*>::iterator itbeg;
+				bool need_to_resize = false;
+
+				//
+				// Copy the arguments
+				//
 				char* dst = &m_paramstr_storage[0];
 				char* dstend = &m_paramstr_storage[0] + m_paramstr_storage.size() - 1;
 
-				while(*src != 0 && dst < dstend)
+				for(it = itbeg = strings->begin(); it != strings->end(); ++it)
 				{
-					*dst++ = *src++;
-				}
-			}
+					char* src = *it;
 
-			//if(param->m_len > m_paramstr_storage.size())
-			//{
-			//	m_paramstr_storage.resize(param->m_len);
-			//}
+					if(it != itbeg)
+					{
+						if(dst < dstend - 3)
+						{
+							*dst++ = ',';
+							*dst++ = ' ';
+						}
+					}
+
+					while(*src != 0 && dst < dstend)
+					{
+						*dst++ = *src++;
+					}
+
+					if(dst == dstend - 1)
+					{
+						//
+						// Reached the end of m_paramstr_storage, we need to resize it
+						//
+						need_to_resize = true;
+						break;
+					}
+				}
+
+				if(need_to_resize)
+				{
+					m_paramstr_storage.resize(m_paramstr_storage.size() * 2);
+					continue;
+				}
+
+				break;
+			}
+		}
+		break;
+	case PT_CHARBUF_PAIR_ARRAY:
+		{
+			ASSERT(param->m_len == sizeof(uint64_t));
+			pair<vector<char*>*, vector<char*>*>* pairs = 
+				(pair<vector<char*>*, vector<char*>*>*)*(uint64_t *)param->m_val;
+
+			ASSERT(pairs->first->size() == pairs->second->size());
+
+			while(true)
+			{
+				vector<char*>::iterator it1;
+				vector<char*>::iterator itbeg1;
+				vector<char*>::iterator it2;
+				vector<char*>::iterator itbeg2;
+				bool need_to_resize = false;
+
+				//
+				// Copy the arguments
+				//
+				char* dst = &m_paramstr_storage[0];
+				char* dstend = &m_paramstr_storage[0] + m_paramstr_storage.size() - 1;
+
+				for(it1 = itbeg1 = pairs->first->begin(), it2 = itbeg2 = pairs->second->begin(); 
+					it1 != pairs->first->end(), it2 != pairs->second->end(); 
+					++it1, ++it2)
+				{
+					char* src = *it1;
+
+					if(it1 != itbeg1)
+					{
+						if(dst < dstend - 3)
+						{
+							*dst++ = ',';
+							*dst++ = ' ';
+						}
+					}
+
+					//
+					// Copy the first string
+					//
+					while(*src != 0 && dst < dstend)
+					{
+						*dst++ = *src++;
+					}
+
+					//
+					// Copy the second string
+					//
+					src = *it2;
+					while(*src != 0 && dst < dstend)
+					{
+						*dst++ = *src++;
+					}
+
+					if(dst == dstend - 1)
+					{
+						//
+						// Reached the end of m_paramstr_storage, we need to resize it
+						//
+						need_to_resize = true;
+						break;
+					}
+				}
+
+				if(need_to_resize)
+				{
+					m_paramstr_storage.resize(m_paramstr_storage.size() * 2);
+					continue;
+				}
+
+				break;
+			}
 		}
 		break;
 	default:
