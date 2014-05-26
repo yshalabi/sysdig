@@ -1158,7 +1158,9 @@ const char* sinsp_evt::get_param_as_str(uint32_t id, OUT const char** resolved_s
 	case PT_CHARBUFARRAY:
 		{
 			ASSERT(param->m_len == sizeof(uint64_t));
-			vector<char*>* strings = (vector<char*>*)*(uint64_t *)param->m_val;
+			vector<char*>* strvect = (vector<char*>*)*(uint64_t *)param->m_val;
+
+			m_paramstr_storage[0] = 0;
 
 			while(true)
 			{
@@ -1170,18 +1172,17 @@ const char* sinsp_evt::get_param_as_str(uint32_t id, OUT const char** resolved_s
 				// Copy the arguments
 				//
 				char* dst = &m_paramstr_storage[0];
-				char* dstend = &m_paramstr_storage[0] + m_paramstr_storage.size() - 1;
+				char* dstend = &m_paramstr_storage[0] + m_paramstr_storage.size() - 2;
 
-				for(it = itbeg = strings->begin(); it != strings->end(); ++it)
+				for(it = itbeg = strvect->begin(); it != strvect->end(); ++it)
 				{
 					char* src = *it;
 
 					if(it != itbeg)
 					{
-						if(dst < dstend - 3)
+						if(dst < dstend - 1)
 						{
 							*dst++ = ',';
-							*dst++ = ' ';
 						}
 					}
 
@@ -1190,7 +1191,7 @@ const char* sinsp_evt::get_param_as_str(uint32_t id, OUT const char** resolved_s
 						*dst++ = *src++;
 					}
 
-					if(dst == dstend - 1)
+					if(dst == dstend)
 					{
 						//
 						// Reached the end of m_paramstr_storage, we need to resize it
@@ -1206,6 +1207,8 @@ const char* sinsp_evt::get_param_as_str(uint32_t id, OUT const char** resolved_s
 					continue;
 				}
 
+				*dst = 0;
+
 				break;
 			}
 		}
@@ -1215,8 +1218,9 @@ const char* sinsp_evt::get_param_as_str(uint32_t id, OUT const char** resolved_s
 			ASSERT(param->m_len == sizeof(uint64_t));
 			pair<vector<char*>*, vector<char*>*>* pairs = 
 				(pair<vector<char*>*, vector<char*>*>*)*(uint64_t *)param->m_val;
-
 			ASSERT(pairs->first->size() == pairs->second->size());
+
+			m_paramstr_storage[0] = 0;
 
 			while(true)
 			{
@@ -1230,20 +1234,19 @@ const char* sinsp_evt::get_param_as_str(uint32_t id, OUT const char** resolved_s
 				// Copy the arguments
 				//
 				char* dst = &m_paramstr_storage[0];
-				char* dstend = &m_paramstr_storage[0] + m_paramstr_storage.size() - 1;
+				char* dstend = &m_paramstr_storage[0] + m_paramstr_storage.size() - 2;
 
 				for(it1 = itbeg1 = pairs->first->begin(), it2 = itbeg2 = pairs->second->begin(); 
-					it1 != pairs->first->end(), it2 != pairs->second->end(); 
+					it1 != pairs->first->end(); 
 					++it1, ++it2)
 				{
 					char* src = *it1;
 
 					if(it1 != itbeg1)
 					{
-						if(dst < dstend - 3)
+						if(dst < dstend - 1)
 						{
 							*dst++ = ',';
-							*dst++ = ' ';
 						}
 					}
 
@@ -1255,6 +1258,11 @@ const char* sinsp_evt::get_param_as_str(uint32_t id, OUT const char** resolved_s
 						*dst++ = *src++;
 					}
 
+					if(dst < dstend - 1)
+					{
+						*dst++ = ':';
+					}
+
 					//
 					// Copy the second string
 					//
@@ -1264,7 +1272,7 @@ const char* sinsp_evt::get_param_as_str(uint32_t id, OUT const char** resolved_s
 						*dst++ = *src++;
 					}
 
-					if(dst == dstend - 1)
+					if(dst == dstend)
 					{
 						//
 						// Reached the end of m_paramstr_storage, we need to resize it
@@ -1279,6 +1287,8 @@ const char* sinsp_evt::get_param_as_str(uint32_t id, OUT const char** resolved_s
 					m_paramstr_storage.resize(m_paramstr_storage.size() * 2);
 					continue;
 				}
+
+				*dst = 0;
 
 				break;
 			}

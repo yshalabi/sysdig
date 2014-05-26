@@ -205,7 +205,6 @@ void sinsp_parser::process_event(sinsp_evt *evt)
 	case PPME_SOCKET_SENDMSG_E:
 		store_event(evt);
 		break;
-/*
 	case PPME_SYSCALL_WRITE_E:
 		evt->m_fdinfo = evt->m_tinfo->get_fd(evt->m_tinfo->m_lastevent_fd);
 		if(evt->m_fdinfo)
@@ -217,7 +216,6 @@ void sinsp_parser::process_event(sinsp_evt *evt)
 			}
 		}
 		break;
-*/
 	case PPME_SYSCALL_READ_X:
 	case PPME_SYSCALL_WRITE_X:
 	case PPME_SOCKET_RECV_X:
@@ -1913,6 +1911,7 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 		p->process_event_data(data, datalen);
 		if(p->m_res != sinsp_usrevtparser::RES_OK)
 		{
+			evt->m_flt_flag = sinsp_evt::FF_FILTER_OUT;
 			return;
 		}
 
@@ -1941,9 +1940,9 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 		lens[1] = 8;
 		lens[2] = 8;
 
-		*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 4) = p->m_id;
-		*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 12) = (uint64_t)&p->m_tags;
-		*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 20) = (uint64_t)&p->m_args;
+		*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 6) = p->m_id;
+		*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 14) = (uint64_t)&p->m_tags;
+		*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 22) = (uint64_t)&p->m_args;
 
 		evt->m_pevt = m_fake_userevt;
 		evt->init();
@@ -1955,6 +1954,8 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 		tinfo->m_lastevent_type = PPME_USER_E;
 		tinfo->m_latency = 0;
 		tinfo->m_last_latency_entertime = 0;
+
+		return;
 	}
 
 	//
@@ -3005,7 +3006,7 @@ inline void sinsp_usrevtparser::parse(char* evtstr, uint32_t evtstrlen)
 	// Reset the content
 	//
 	p = m_storage;
-	m_id = NULL;
+	m_id = 0;
 	m_tags.clear();
 	m_argnames.clear();
 	m_argvals.clear();
