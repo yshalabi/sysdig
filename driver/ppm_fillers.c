@@ -568,7 +568,7 @@ static int f_sys_write_x(struct event_filler_arguments *args)
 	 */
 	if (is_user_evt) {
 		snaplen = RW_SNAPLEN_EVENT;
-		retval = PPM_USERVET_MAGIC;
+		retval = -PPM_USERVET_MAGIC;
 	} else {
 		retval = (int64_t)(long)syscall_get_return_value(current, args->regs);
 	}
