@@ -163,6 +163,19 @@ void sinsp_parser::process_event(sinsp_evt *evt)
 	{
 		ppm_event_flags eflags = evt->get_flags();
 
+		if(etype == PPME_SYSCALL_WRITE_X)
+		{
+			//
+			// Writes with PPM_USERVET_MAGIC as return code are user events
+			//
+			sinsp_evt_param* parinfo = evt->get_param(0);
+			ASSERT(parinfo->m_len == sizeof(int64_t));
+			if(*(int64_t *)parinfo->m_val == -PPM_USERVET_MAGIC)
+			{
+				eflags = (ppm_event_flags)(((uint64_t)eflags) | EF_MODIFIES_STATE);
+			}
+		}
+
 		if(eflags & EF_MODIFIES_STATE)
 		{
 			do_filter_later = true;
@@ -421,7 +434,7 @@ bool sinsp_parser::reset(sinsp_evt *evt)
 
 		if(eflags & EF_USES_FD)
 		{
-			sinsp_evt_param *parinfo;
+			sinsp_evt_param* parinfo;
 
 			//
 			// Get the fd.
@@ -1889,16 +1902,18 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 	sinsp_fdinfo_t* fdinfo = evt->m_fdinfo;
 	sinsp_threadinfo* tinfo = evt->m_tinfo;
 
-	if(!fdinfo)
-	{
-		return;
-	}
+	//
+	// Extract the return value
+	//
+	parinfo = evt->get_param(0);
+	ASSERT(parinfo->m_len == sizeof(int64_t));
+	retval = *(int64_t *)parinfo->m_val;
 
 	//
 	// User events get into the engine as normal writes, but the FD has a flag to
 	// quickly recognize them.
 	//
-	if(fdinfo->m_flags & sinsp_fdinfo_t::FLAGS_IS_USER_EVENT_FD)
+	if(retval == -PPM_USERVET_MAGIC)
 	{
 		//
 		// Extract the data buffer
@@ -1964,12 +1979,10 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 		return;
 	}
 
-	//
-	// Extract the return value
-	//
-	parinfo = evt->get_param(0);
-	ASSERT(parinfo->m_len == sizeof(int64_t));
-	retval = *(int64_t *)parinfo->m_val;
+	if(!fdinfo)
+	{
+		return;
+	}
 
 	//
 	// If the operation was successful, validate that the fd exists

@@ -902,7 +902,7 @@ struct ppm_syscall_desc {
 /*
  * Magic return code to identify a user event 
  */
-#define PPM_USERVET_MAGIC -959222
+#define PPM_USERVET_MAGIC 959222
 
 extern const struct ppm_name_value socket_families[];
 extern const struct ppm_name_value file_flags[];
