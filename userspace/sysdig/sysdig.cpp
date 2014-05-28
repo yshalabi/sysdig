@@ -411,6 +411,15 @@ captureinfo do_inspect(sinsp* inspector,
 			// Notify the chisels that we're exiting.
 			//
 			chisels_on_capture_end();
+
+			// Notify the formatter that we are at the 
+			// end of the capture in case it needs to 
+			// write any terminating characters
+			if(formatter->on_capture_end(&line))
+			{
+				cout << line << endl;
+			}
+
 			break;
 		}
 
@@ -532,7 +541,7 @@ captureinfo do_inspect(sinsp* inspector,
 			if(formatter->tostring(ev, &line))
 			{
 				//
-				// If there's a display filter, not it's time to run it
+				// If there's a display filter, now it's time to run it
 				//
 				if(display_filter)
 				{
@@ -542,10 +551,11 @@ captureinfo do_inspect(sinsp* inspector,
 					}
 				}
 
-				//
-				// Output the line
-				//
-				cout << line << endl;
+				cout << line;
+				if( inspector->get_buffer_format() != sinsp_evt::PF_JSON)
+				{
+					cout << endl;
+				}
 			}
 		}
 	}

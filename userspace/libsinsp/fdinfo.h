@@ -181,7 +181,7 @@ private:
 		FLAGS_IS_USER_EVENT_FD = (1 << 7),
 	};
 
-	void add_filename(const char* directory, uint32_t directorylen, const char* filename, uint32_t filenamelen);
+	void add_filename(const char* fullpath);
 
 	bool is_role_server()
 	{

@@ -157,8 +157,10 @@ void sinsp_parser::process_event(sinsp_evt *evt)
 #if defined(HAS_CAPTURE)
 	if(m_inspector->is_live() && !m_inspector->is_debug_enabled())
 	{
-		if(evt->get_tid() == m_sysdig_pid && etype != PPME_SCHEDSWITCH_E && 
-			m_sysdig_pid && etype != PPME_SCHEDSWITCHEX_E)
+		if(evt->get_tid() == m_sysdig_pid && 
+			etype != PPME_SCHEDSWITCH_1_E && 
+			etype != PPME_SCHEDSWITCH_6_E &&
+			m_sysdig_pid)
 		{
 			evt->m_flt_flag = sinsp_evt::FF_FILTER_OUT;
 			return;
@@ -268,10 +270,12 @@ void sinsp_parser::process_event(sinsp_evt *evt)
 	case PPME_SYSCALL_EPOLLWAIT_E:
 		parse_select_poll_epollwait_enter(evt);
 		break;
-	case PPME_CLONE_X:
+	case PPME_CLONE_11_X:
+	case PPME_CLONE_16_X:
 		parse_clone_exit(evt);
 		break;
-	case PPME_SYSCALL_EXECVE_X:
+	case PPME_SYSCALL_EXECVE_8_X:
+	case PPME_SYSCALL_EXECVE_13_X:
 		parse_execve_exit(evt);
 		break;
 	case PPME_PROCEXIT_E:
@@ -342,9 +346,12 @@ void sinsp_parser::process_event(sinsp_evt *evt)
 	case PPME_SOCKET_SOCKETPAIR_X:
 		parse_socketpair_exit(evt);
 		break;
-	case PPME_SCHEDSWITCHEX_E:
+	case PPME_SCHEDSWITCH_1_E:
+	case PPME_SCHEDSWITCH_6_E:
 		parse_context_switch(evt);
 		break;
+	case PPME_SYSCALL_BRK_4_X:
+		parse_brk_exit(evt);
 	default:
 		break;
 	}
@@ -394,7 +401,7 @@ bool sinsp_parser::reset(sinsp_evt *evt)
 	//
 	// Ignore scheduler events
 	//
-	if(etype >= PPME_SCHEDSWITCH_E && etype <= PPME_DROP_X)
+	if(etype >= PPME_SCHEDSWITCH_1_E && etype <= PPME_DROP_X)
 	{
 		return false;
 	}
@@ -408,7 +415,10 @@ bool sinsp_parser::reset(sinsp_evt *evt)
 	// (many kernel thread), we don't look for /proc
 	//
 	bool query_os;
-	if(etype == PPME_CLONE_X || etype == PPME_SCHEDSWITCHEX_E)
+	if(etype == PPME_CLONE_11_X ||
+		etype == PPME_CLONE_16_X ||
+		etype == PPME_SCHEDSWITCH_1_E ||
+		etype == PPME_SCHEDSWITCH_6_E)
 	{
 		query_os = false;
 	}
@@ -419,14 +429,16 @@ bool sinsp_parser::reset(sinsp_evt *evt)
 
 	evt->m_tinfo = evt->get_thread_info(query_os);
 
-	if(etype == PPME_SCHEDSWITCHEX_E)
+	if(etype == PPME_SCHEDSWITCH_1_E ||
+		etype == PPME_SCHEDSWITCH_6_E)
 	{
 		return false;
 	}
 
 	if(!evt->m_tinfo)
 	{
-		if(etype == PPME_CLONE_X)
+		if(etype == PPME_CLONE_11_X ||
+			etype == PPME_CLONE_16_X)
 		{
 #ifdef GATHER_INTERNAL_STATS
 			m_inspector->m_thread_manager->m_failed_lookups->decrement();
@@ -514,7 +526,13 @@ bool sinsp_parser::reset(sinsp_evt *evt)
 			{
 				return false;
 			}
-			else if(evt->m_fdinfo->m_flags & sinsp_fdinfo_t::FLAGS_CLOSE_CANCELED)
+
+			if(evt->m_errorcode != 0 && m_fd_listener)
+			{
+				m_fd_listener->on_error(evt);
+			}
+			
+			if(evt->m_fdinfo->m_flags & sinsp_fdinfo_t::FLAGS_CLOSE_CANCELED)
 			{
 				//
 				// A close gets canceled when the same fd is created succesfully between
@@ -661,7 +679,17 @@ void sinsp_parser::parse_clone_exit(sinsp_evt *evt)
 			//
 			// Get the flags, and check if this is a process or a new thread
 			//
-			parinfo = evt->get_param(8);
+			switch(evt->get_type())
+			{
+				case PPME_CLONE_11_X:
+					parinfo = evt->get_param(8);
+					break;
+				case PPME_CLONE_16_X:
+					parinfo = evt->get_param(13);
+					break;
+				default:
+					ASSERT(false);
+			}
 			ASSERT(parinfo->m_len == sizeof(int32_t));
 			uint32_t flags = *(int32_t *)parinfo->m_val;
 
@@ -759,7 +787,17 @@ void sinsp_parser::parse_clone_exit(sinsp_evt *evt)
 	tinfo.m_pid = *(int64_t *)parinfo->m_val;
 
 	// Get the flags, and check if this is a thread or a new thread
-	parinfo = evt->get_param(8);
+	switch(evt->get_type())
+	{
+		case PPME_CLONE_11_X:
+			parinfo = evt->get_param(8);
+			break;
+		case PPME_CLONE_16_X:
+			parinfo = evt->get_param(13);
+			break;
+		default:
+			ASSERT(false);
+	}
 	ASSERT(parinfo->m_len == sizeof(int32_t));
 	tinfo.m_flags = *(int32_t *)parinfo->m_val;
 
@@ -809,13 +847,61 @@ void sinsp_parser::parse_clone_exit(sinsp_evt *evt)
 	ASSERT(parinfo->m_len == sizeof(int64_t));
 	tinfo.m_fdlimit = *(int64_t *)parinfo->m_val;
 
+	if(evt->get_type() == PPME_CLONE_16_X)
+	{
+		// Get the pgflt_maj
+		parinfo = evt->get_param(8);
+		ASSERT(parinfo->m_len == sizeof(uint64_t));
+		tinfo.m_pfmajor = *(uint64_t *)parinfo->m_val;
+
+		// Get the pgflt_min
+		parinfo = evt->get_param(9);
+		ASSERT(parinfo->m_len == sizeof(uint64_t));
+		tinfo.m_pfminor = *(uint64_t *)parinfo->m_val;
+
+		// Get the vm_size
+		parinfo = evt->get_param(10);
+		ASSERT(parinfo->m_len == sizeof(uint32_t));
+		tinfo.m_vmsize_kb = *(uint32_t *)parinfo->m_val;
+
+		// Get the vm_rss
+		parinfo = evt->get_param(11);
+		ASSERT(parinfo->m_len == sizeof(uint32_t));
+		tinfo.m_vmrss_kb = *(uint32_t *)parinfo->m_val;
+
+		// Get the vm_swap
+		parinfo = evt->get_param(12);
+		ASSERT(parinfo->m_len == sizeof(uint32_t));
+		tinfo.m_vmswap_kb = *(uint32_t *)parinfo->m_val;
+	}
+
 	// Copy the uid
-	parinfo = evt->get_param(9);
+	switch(evt->get_type())
+	{
+		case PPME_CLONE_11_X:
+			parinfo = evt->get_param(9);
+			break;
+		case PPME_CLONE_16_X:
+			parinfo = evt->get_param(14);
+			break;
+		default:
+			ASSERT(false);
+	}
 	ASSERT(parinfo->m_len == sizeof(int32_t));
 	tinfo.m_uid = *(int32_t *)parinfo->m_val;
 
 	// Copy the uid
-	parinfo = evt->get_param(10);
+	switch(evt->get_type())
+	{
+		case PPME_CLONE_11_X:
+			parinfo = evt->get_param(10);
+			break;
+		case PPME_CLONE_16_X:
+			parinfo = evt->get_param(15);
+			break;
+		default:
+			ASSERT(false);
+	}
 	ASSERT(parinfo->m_len == sizeof(int32_t));
 	tinfo.m_gid = *(int32_t *)parinfo->m_val;
 
@@ -894,6 +980,34 @@ void sinsp_parser::parse_execve_exit(sinsp_evt *evt)
 	parinfo = evt->get_param(7);
 	ASSERT(parinfo->m_len == sizeof(int64_t));
 	evt->m_tinfo->m_fdlimit = *(int64_t *)parinfo->m_val;
+
+	if(evt->get_type() == PPME_SYSCALL_EXECVE_13_X)
+	{
+		// Get the pgflt_maj
+		parinfo = evt->get_param(8);
+		ASSERT(parinfo->m_len == sizeof(uint64_t));
+		evt->m_tinfo->m_pfmajor = *(uint64_t *)parinfo->m_val;
+
+		// Get the pgflt_min
+		parinfo = evt->get_param(9);
+		ASSERT(parinfo->m_len == sizeof(uint64_t));
+		evt->m_tinfo->m_pfminor = *(uint64_t *)parinfo->m_val;
+
+		// Get the vm_size
+		parinfo = evt->get_param(10);
+		ASSERT(parinfo->m_len == sizeof(uint32_t));
+		evt->m_tinfo->m_vmsize_kb = *(uint32_t *)parinfo->m_val;
+
+		// Get the vm_rss
+		parinfo = evt->get_param(11);
+		ASSERT(parinfo->m_len == sizeof(uint32_t));
+		evt->m_tinfo->m_vmrss_kb = *(uint32_t *)parinfo->m_val;
+
+		// Get the vm_swap
+		parinfo = evt->get_param(12);
+		ASSERT(parinfo->m_len == sizeof(uint32_t));
+		evt->m_tinfo->m_vmswap_kb = *(uint32_t *)parinfo->m_val;
+	}
 
 	//
 	// execve starts with a clean fd list, so we get rid of the fd list that clone
@@ -1009,14 +1123,6 @@ void sinsp_parser::parse_open_openat_creat_exit(sinsp_evt *evt)
 	ASSERT(parinfo->m_len == sizeof(int64_t));
 	fd = *(int64_t *)parinfo->m_val;
 
-	if(fd < 0)
-	{
-		//
-		// The syscall failed. Nothing to add to the table.
-		//
-		return;
-	}
-
 	//
 	// Parse the parameters, based on the event type
 	//
@@ -1069,36 +1175,44 @@ void sinsp_parser::parse_open_openat_creat_exit(sinsp_evt *evt)
 	//ASSERT(parinfo->m_len == sizeof(uint32_t));
 	//mode = *(uint32_t*)parinfo->m_val;
 
-	//
-	// Populate the new fdi
-	//
-	if(flags & PPM_O_DIRECTORY)
-	{
-		fdi.m_type = SCAP_FD_DIRECTORY;
-	}
-	else
-	{
-		fdi.m_type = SCAP_FD_FILE;		
-	}
+	char fullpath[SCAP_MAX_PATH_SIZE];
+	sinsp_utils::concatenate_paths(fullpath, SCAP_MAX_PATH_SIZE, sdir.c_str(), sdir.length(), name, namelen);
 
-	fdi.m_openflags = flags;
-	fdi.add_filename(sdir.c_str(),
-		sdir.length(),
-		name,
-		namelen);
+	if(fd >= 0)
+	{
+		//
+		// Populate the new fdi
+		//
+		if(flags & PPM_O_DIRECTORY)
+		{
+			fdi.m_type = SCAP_FD_DIRECTORY;
+		}
+		else
+		{
+			fdi.m_type = SCAP_FD_FILE;		
+		}
+
+		fdi.m_openflags = flags;
+		fdi.add_filename(fullpath);
+
+		//
+		// If this is a user event fd, mark it with the proper flag
+		//
+		if(fdi.m_name == USER_EVT_DEVICE_NAME)
+		{
+			fdi.m_flags |= sinsp_fdinfo_t::FLAGS_IS_USER_EVENT_FD;
+		}
 	
-	//
-	// If this is a user event fd, mark it with the proper flag
-	//
-	if(fdi.m_name == USER_EVT_DEVICE_NAME)
-	{
-		fdi.m_flags |= sinsp_fdinfo_t::FLAGS_IS_USER_EVENT_FD;
+		//
+		// Add the fd to the table.
+		//
+		evt->m_fdinfo = evt->m_tinfo->add_fd(fd, &fdi);
 	}
 
-	//
-	// Add the fd to the table.
-	//
-	evt->m_fdinfo = evt->m_tinfo->add_fd(fd, &fdi);
+	if(m_fd_listener && !(flags & PPM_O_DIRECTORY))
+	{
+		m_fd_listener->on_file_create(evt, fullpath);
+	}
 }
 
 //
@@ -2702,6 +2816,27 @@ void sinsp_parser::parse_context_switch(sinsp_evt* evt)
 		ASSERT(parinfo->m_len == sizeof(uint32_t));
 
 		parinfo = evt->get_param(5);
+		evt->m_tinfo->m_vmswap_kb = *(uint32_t *)parinfo->m_val;
+		ASSERT(parinfo->m_len == sizeof(uint32_t));
+	}
+}
+
+void sinsp_parser::parse_brk_exit(sinsp_evt* evt)
+{
+	ASSERT(evt->m_tinfo);
+	if(evt->m_tinfo)
+	{
+		sinsp_evt_param *parinfo;
+
+		parinfo = evt->get_param(1);
+		evt->m_tinfo->m_vmsize_kb = *(uint32_t *)parinfo->m_val;
+		ASSERT(parinfo->m_len == sizeof(uint32_t));
+
+		parinfo = evt->get_param(2);
+		evt->m_tinfo->m_vmrss_kb = *(uint32_t *)parinfo->m_val;
+		ASSERT(parinfo->m_len == sizeof(uint32_t));
+
+		parinfo = evt->get_param(3);
 		evt->m_tinfo->m_vmswap_kb = *(uint32_t *)parinfo->m_val;
 		ASSERT(parinfo->m_len == sizeof(uint32_t));
 	}
