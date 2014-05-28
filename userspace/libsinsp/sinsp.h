@@ -90,6 +90,7 @@ class sinsp_partial_transaction;
 class sinsp_parser;
 class sinsp_analyzer;
 class sinsp_filter;
+class sinsp_usrevtstorage;
 
 vector<string> sinsp_split(const string &s, char delim);
 
@@ -546,6 +547,12 @@ private:
 	// Some dropping infrastructure
 	//
 	bool m_isdropping;
+
+	//
+	// list of ongoing user events
+	//
+	list<sinsp_usrevtstorage*> m_partial_user_events;
+
 
 	friend class sinsp_parser;
 	friend class sinsp_analyzer;

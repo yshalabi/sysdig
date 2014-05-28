@@ -25,91 +25,9 @@ along with sysdig.  If not, see <http://www.gnu.org/licenses/>.
 class sinsp_delays_info;
 class sinsp_threadtable_listener;
 class thread_analyzer_info;
-
-///////////////////////////////////////////////////////////////////////////////
-// user event parser
-///////////////////////////////////////////////////////////////////////////////
-class sinsp_usrevtparser
-{
-public:
-	enum parse_result
-	{
-		RES_OK = 0,
-		RES_COMMA = 1,
-		RES_FAILED = 2,
-		RES_TRUNCATED = 3,
-	};
-
-	sinsp_usrevtparser();
-	~sinsp_usrevtparser();
-
-	inline sinsp_usrevtparser::parse_result process_event_data(char *data, uint32_t datalen);
-	inline void parse(char* evtstr, uint32_t evtstrlen);
-
-	bool m_is_enter;
-	char* m_id;
-	vector<char*> m_tags;
-	vector<char*> m_argnames;
-	vector<char*> m_argvals;
-	pair<vector<char*>*, vector<char*>*> m_args;
-
-VISIBILITY_PRIVATE
-	inline parse_result skip_spaces(char* p, uint32_t* delta);
-	inline parse_result skip_spaces_and_commas(char* p, uint32_t* delta, uint32_t n_expected_commas);
-	inline parse_result skip_spaces_and_columns(char* p, uint32_t* delta);
-	inline parse_result skip_spaces_and_commas_and_sq_brakets(char* p, uint32_t* delta);
-	inline parse_result skip_spaces_and_commas_and_cr_brakets(char* p, uint32_t* delta);
-	inline parse_result skip_spaces_and_commas_and_all_brakets(char* p, uint32_t* delta);
-
-	inline parse_result parsestr(char* p, char** res, uint32_t* delta);
-	inline parse_result parsestr_not_enforce(char* p, char** res, uint32_t* delta);
-	inline parse_result parsenumber(char* p, char** res, uint32_t* delta);
-
-	inline void push_fragment(char* evtstr, uint32_t evtstrlen);
-
-	//
-	// For testing purposes
-	//
-	void parse_test(char* evtstr, uint32_t evtstrlen);
-	sinsp_usrevtparser::parse_result process_event_data_test(char *data, uint32_t datalen);
-
-	char* m_storage;
-	uint32_t m_storage_size;
-	uint32_t m_fragment_size;
-	sinsp_usrevtparser::parse_result m_res;
-	string m_fullfragment_storage_str;
-
-	friend class sinsp_parser;
-};
+class sinsp_usrevtparser;
 
 #define UESTORAGE_INITIAL_BUFSIZE 256
-
-class sinsp_usrevtstorage
-{
-public:
-	sinsp_usrevtstorage()
-	{
-		m_tags = (char*)malloc(UESTORAGE_INITIAL_BUFSIZE);
-		m_args = (char*)malloc(UESTORAGE_INITIAL_BUFSIZE);
-		m_tags_size = UESTORAGE_INITIAL_BUFSIZE;
-		m_args_size = UESTORAGE_INITIAL_BUFSIZE;
-	}
-
-	~sinsp_usrevtstorage()
-	{
-		free(m_tags); 
-		free(m_args); 
-	}
-
-	void init(sinsp_usrevtparser* details)
-	{
-	}
-
-	char* m_tags;
-	char* m_args;
-	uint32_t m_tags_size;
-	uint32_t m_args_size;
-};
 
 typedef struct erase_fd_params
 {
@@ -243,7 +161,7 @@ public:
 	//
 	// Parser for the user events. Public so that filter fields can access it
 	//
-	sinsp_usrevtparser m_userevt_parser;
+	sinsp_usrevtparser* m_userevt_parser;
 
 	thread_analyzer_info* m_ainfo;
 

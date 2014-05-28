@@ -23,6 +23,7 @@ along with sysdig.  If not, see <http://www.gnu.org/licenses/>.
 #include <algorithm>
 #include "sinsp.h"
 #include "sinsp_int.h"
+#include "appevts.h"
 
 static void copy_ipv6_address(uint32_t* dest, uint32_t* src)
 {
@@ -76,6 +77,7 @@ void sinsp_threadinfo::init()
 	m_latency = 0;
 #endif
 	m_ainfo = NULL;
+	m_userevt_parser = new sinsp_usrevtparser();
 }
 
 sinsp_threadinfo::~sinsp_threadinfo()
@@ -95,6 +97,11 @@ sinsp_threadinfo::~sinsp_threadinfo()
 	}
 
 	m_private_state.clear();
+
+	if(m_userevt_parser)
+	{
+		delete m_userevt_parser;
+	}
 }
 
 void sinsp_threadinfo::fix_sockets_coming_from_proc()
