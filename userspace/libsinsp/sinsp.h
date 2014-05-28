@@ -61,6 +61,7 @@ along with sysdig.  If not, see <http://www.gnu.org/licenses/>.
 #include <queue>
 #include <vector>
 #include <set>
+#include <list>
 
 using namespace std;
 

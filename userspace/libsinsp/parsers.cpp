@@ -106,14 +106,14 @@ int pi = sizeof(doc);
 		printf("ERROR\n");
 	}
 
-	vector<char*>::iterator it;
-
+/*
 	sinsp_partial_appevt* st = ueq.pop();
 
 	if(st != NULL)
 	{
 		st->init(&p);
 	}
+*/	
 }
 cpu_time = ((float)clock()/ CLOCKS_PER_SEC) - cpu_time;
 printf ("tempo: %5.2f\n", cpu_time);
