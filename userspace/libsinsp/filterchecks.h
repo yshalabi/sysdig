@@ -419,6 +419,23 @@ public:
 };
 
 //
+// Application events
+//
+class sinsp_filter_check_appevt : public sinsp_filter_check
+{
+public:
+	enum check_type
+	{
+		TYPE_GID,
+		TYPE_TAG,
+	};
+
+	sinsp_filter_check_appevt();
+	sinsp_filter_check* allocate_new();
+	uint8_t* extract(sinsp_evt *evt, OUT uint32_t* len);
+};
+
+//
 // Fake filter check used by the event formatter to render format text
 //
 class rawstring_check : public sinsp_filter_check

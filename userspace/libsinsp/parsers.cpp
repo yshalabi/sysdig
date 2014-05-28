@@ -44,7 +44,7 @@ along with sysdig.  If not, see <http://www.gnu.org/licenses/>.
 bool should_drop(sinsp_evt *evt);
 #endif
 
-#if 0
+#if 1
 #include <time.h>
 
 sinsp_parser::sinsp_parser(sinsp *inspector) :
@@ -67,6 +67,7 @@ char doc3[] = "5, >, [\"mysql\", \"query\", \"init\"], [{\"argname1\":\"argval1\
 char tb[2];
 tb[1] = 0;
 sinsp_usrevtparser p;
+simple_lifo_queue<sinsp_usrevtstorage> ueq(128);
 printf("1\n");
 
 float cpu_time = ((float)clock ()) / CLOCKS_PER_SEC;
@@ -100,6 +101,20 @@ int pi = sizeof(doc);
 	if(p.m_res != sinsp_usrevtparser::RES_OK)
 	{
 		printf("ERROR\n");
+	}
+
+	vector<char*>::iterator it;
+
+	sinsp_usrevtstorage* st = ueq.pop();
+
+	if(st != NULL)
+	{
+		char* send = st->m_tags;
+		for(it = p.m_tags.begin(); it != p.m_tags.end(); ++it)
+		{
+			memcpy(send, *it, 5);
+			send += 5;
+		}
 	}
 }
 cpu_time = ((float)clock()/ CLOCKS_PER_SEC) - cpu_time;
@@ -1949,7 +1964,8 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 			lens[1] = 8;
 			lens[2] = 8;
 
-			*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 6) = p->m_id;
+//			*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 6) = p->m_id;
+			*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 6) = 123;
 			*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 14) = (uint64_t)&p->m_tags;
 			*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 22) = (uint64_t)&p->m_args;
 		}
@@ -1960,7 +1976,8 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 			uint16_t *lens = (uint16_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr));
 			lens[0] = 8;
 
-			*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 2) = p->m_id;
+//			*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 2) = p->m_id;
+			*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 2) = 123;
 		}
 
 		scap_evt* tevt = evt->m_pevt;
@@ -2962,6 +2979,7 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parsestr(char* p, ch
 	return sinsp_usrevtparser::RES_OK;
 }
 
+/*
 inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parsenumber(char* p, uint64_t* res, uint32_t* delta)
 {
 	char* start = p;
@@ -2994,7 +3012,38 @@ inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parsenumber(char* p,
 	*delta = (p - start + 1);
 	return retval;
 }
+*/
+inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parsenumber(char* p, char** res, uint32_t* delta)
+{
+	char* start = p;
+	sinsp_usrevtparser::parse_result retval = sinsp_usrevtparser::RES_OK;
 
+	*res = p;
+
+	while(*p >= '0' && *p <= '9')
+	{
+		p++;
+	}
+
+	if(*p == ',')
+	{
+		retval = sinsp_usrevtparser::RES_COMMA;
+	}
+	else if(*p != 0 && *p != ' ')
+	{
+		return sinsp_usrevtparser::RES_FAILED;
+	}
+	else if(*p == 0)
+	{
+		return sinsp_usrevtparser::RES_TRUNCATED;
+	}
+
+
+	*p = 0;
+
+	*delta = (p - start + 1);
+	return retval;
+}
 inline sinsp_usrevtparser::parse_result sinsp_usrevtparser::parsestr_not_enforce(char* p, char** res, uint32_t* delta)
 {
 	sinsp_usrevtparser::parse_result psres = parsestr(p, res, delta);
@@ -3025,7 +3074,6 @@ inline void sinsp_usrevtparser::parse(char* evtstr, uint32_t evtstrlen)
 	// Reset the content
 	//
 	p = m_storage;
-	m_id = 0;
 	m_tags.clear();
 	m_argnames.clear();
 	m_argvals.clear();

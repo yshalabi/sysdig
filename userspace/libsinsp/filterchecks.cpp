@@ -2016,6 +2016,74 @@ uint8_t* sinsp_filter_check_group::extract(sinsp_evt *evt, OUT uint32_t* len)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// sinsp_filter_check_appevt implementation
+///////////////////////////////////////////////////////////////////////////////
+const filtercheck_field_info sinsp_filter_check_appevt_fields[] =
+{
+	{PT_UINT64, EPF_NONE, PF_DEC, "group.gid", "group ID."},
+	{PT_CHARBUF, EPF_NONE, PF_NA, "group.name", "group name."},
+};
+
+sinsp_filter_check_appevt::sinsp_filter_check_appevt()
+{
+	m_info.m_name = "app";
+	m_info.m_fields = sinsp_filter_check_appevt_fields;
+	m_info.m_nfiedls = sizeof(sinsp_filter_check_appevt_fields) / sizeof(sinsp_filter_check_appevt_fields[0]);
+}
+
+sinsp_filter_check* sinsp_filter_check_appevt::allocate_new()
+{
+	return (sinsp_filter_check*) new sinsp_filter_check_appevt();
+}
+
+uint8_t* sinsp_filter_check_appevt::extract(sinsp_evt *evt, OUT uint32_t* len)
+{
+	sinsp_threadinfo* tinfo = evt->get_thread_info();
+
+	if(tinfo == NULL)
+	{
+		return NULL;
+	}
+
+	switch(m_field_id)
+	{
+	case TYPE_GID:
+		return (uint8_t*)&tinfo->m_gid;
+	case TYPE_TAG:
+		{
+			unordered_map<uint32_t, scap_groupinfo*>::iterator it;
+
+			ASSERT(m_inspector != NULL);
+			unordered_map<uint32_t, scap_groupinfo*>* grouplist = 
+				(unordered_map<uint32_t, scap_groupinfo*>*)m_inspector->get_grouplist();
+			ASSERT(grouplist->size() != 0);
+
+			if(tinfo->m_gid == 0xffffffff)
+			{
+				return NULL;
+			}
+
+			it = grouplist->find(tinfo->m_gid);
+			if(it == grouplist->end())
+			{
+				ASSERT(false);
+				return NULL;
+			}
+
+			scap_groupinfo* ginfo = it->second;
+			ASSERT(ginfo != NULL);
+
+			return (uint8_t*)ginfo->name;
+		}
+	default:
+		ASSERT(false);
+		break;
+	}
+
+	return NULL;
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // rawstring_check implementation
 ///////////////////////////////////////////////////////////////////////////////
 const filtercheck_field_info rawstring_check_fields[] =

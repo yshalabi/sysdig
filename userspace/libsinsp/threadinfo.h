@@ -47,7 +47,7 @@ public:
 	inline void parse(char* evtstr, uint32_t evtstrlen);
 
 	bool m_is_enter;
-	uint64_t m_id;
+	char* m_id;
 	vector<char*> m_tags;
 	vector<char*> m_argnames;
 	vector<char*> m_argvals;
@@ -63,7 +63,7 @@ VISIBILITY_PRIVATE
 
 	inline parse_result parsestr(char* p, char** res, uint32_t* delta);
 	inline parse_result parsestr_not_enforce(char* p, char** res, uint32_t* delta);
-	inline parse_result parsenumber(char* p, uint64_t* res, uint32_t* delta);
+	inline parse_result parsenumber(char* p, char** res, uint32_t* delta);
 
 	inline void push_fragment(char* evtstr, uint32_t evtstrlen);
 
@@ -80,6 +80,35 @@ VISIBILITY_PRIVATE
 	string m_fullfragment_storage_str;
 
 	friend class sinsp_parser;
+};
+
+#define UESTORAGE_INITIAL_BUFSIZE 256
+
+class sinsp_usrevtstorage
+{
+public:
+	sinsp_usrevtstorage()
+	{
+		m_tags = (char*)malloc(UESTORAGE_INITIAL_BUFSIZE);
+		m_args = (char*)malloc(UESTORAGE_INITIAL_BUFSIZE);
+		m_tags_size = UESTORAGE_INITIAL_BUFSIZE;
+		m_args_size = UESTORAGE_INITIAL_BUFSIZE;
+	}
+
+	~sinsp_usrevtstorage()
+	{
+		free(m_tags); 
+		free(m_args); 
+	}
+
+	void init(sinsp_usrevtparser* details)
+	{
+	}
+
+	char* m_tags;
+	char* m_args;
+	uint32_t m_tags_size;
+	uint32_t m_args_size;
 };
 
 typedef struct erase_fd_params
