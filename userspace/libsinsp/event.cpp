@@ -49,6 +49,8 @@ extern sinsp_evttables g_infotables;
 	}                                                       \
 } while(0)
 
+#define SEVT_IPV4_LEN ((3 + 1) * 4 + 1)
+
 ///////////////////////////////////////////////////////////////////////////////
 // sinsp_evt_param implementation
 ///////////////////////////////////////////////////////////////////////////////
@@ -831,12 +833,11 @@ Json::Value sinsp_evt::get_param_as_json(uint32_t id, OUT const char** resolved_
 		{
 			if(param->m_len == 1 + 4 + 2)
 			{
-				int ipv4_len = (3 + 1) * 4 + 1;
-				char ipv4_addr[ ipv4_len ];
+				char ipv4_addr[SEVT_IPV4_LEN];
 
 				snprintf(
 					ipv4_addr,
-					ipv4_len,
+					SEVT_IPV4_LEN,
 						"%u.%u.%u.%u",
 						(unsigned int)(uint8_t)param->m_val[1],
 						(unsigned int)(uint8_t)param->m_val[2],
@@ -872,12 +873,11 @@ Json::Value sinsp_evt::get_param_as_json(uint32_t id, OUT const char** resolved_
 				Json::Value source;
 				Json::Value dest;
 
-				int ipv4_len = (3 + 1) * 4 + 1;
-				char ipv4_addr[ ipv4_len ];
+				char ipv4_addr[SEVT_IPV4_LEN];
 
 				snprintf(
 					ipv4_addr,
-					ipv4_len,
+					SEVT_IPV4_LEN,
 						"%u.%u.%u.%u",
 						(unsigned int)(uint8_t)param->m_val[1],
 						(unsigned int)(uint8_t)param->m_val[2],
@@ -890,7 +890,7 @@ Json::Value sinsp_evt::get_param_as_json(uint32_t id, OUT const char** resolved_
 
 				snprintf(
 					ipv4_addr,
-					ipv4_len,
+					SEVT_IPV4_LEN,
 				         "%u.%u.%u.%u",
 				         (unsigned int)(uint8_t)param->m_val[7],
 				         (unsigned int)(uint8_t)param->m_val[8],
@@ -925,12 +925,11 @@ Json::Value sinsp_evt::get_param_as_json(uint32_t id, OUT const char** resolved_
 					Json::Value source;
 					Json::Value dest;
 
-					int ipv4_len = (3 + 1) * 4 + 1;
-					char ipv4_addr[ ipv4_len ];
+					char ipv4_addr[SEVT_IPV4_LEN];
 
 					snprintf(
 						ipv4_addr,
-						ipv4_len,
+						SEVT_IPV4_LEN,
 							"%u.%u.%u.%u",
 							(unsigned int)sip[0],
 							(unsigned int)sip[1],
@@ -943,7 +942,7 @@ Json::Value sinsp_evt::get_param_as_json(uint32_t id, OUT const char** resolved_
 
 					snprintf(
 						ipv4_addr,
-						ipv4_len,
+						SEVT_IPV4_LEN,
 							"%u.%u.%u.%u",
 							(unsigned int)dip[0],
 							(unsigned int)dip[1],
