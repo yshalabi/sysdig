@@ -69,9 +69,9 @@ char doc2[] = "[1243";
 char doc3[] = "5, >, [\"mysql\", \"query\", \"init\"], [{\"argname1\":\"argval1\"}, {\"argname2\":\"argval2\"}, {\"argname3\":\"argval3\"}]]";
 char tb[2];
 tb[1] = 0;
-sinsp_usrevtparser p;
-simple_lifo_queue<sinsp_partial_appevt> ueq(128);
+sinsp_appevtparser p;
 printf("1\n");
+m_inspector->m_partial_appevts_pool = new simple_lifo_queue<sinsp_partial_appevt>(128);
 
 float cpu_time = ((float)clock ()) / CLOCKS_PER_SEC;
 
@@ -86,7 +86,7 @@ int pi = sizeof(doc);
 	{
 		tb[0] = doc[k];
 		p.process_event_data_test(tb, 1);
-		if(p.m_res != sinsp_usrevtparser::RES_TRUNCATED)
+		if(p.m_res != sinsp_appevtparser::RES_TRUNCATED)
 		{
 			int a = 0;
 		}
@@ -101,7 +101,7 @@ int pi = sizeof(doc);
 */
 	p.process_event_data(doc, sizeof(doc) - 1);
 
-	if(p.m_res != sinsp_usrevtparser::RES_OK)
+	if(p.m_res != sinsp_appevtparser::RES_OK)
 	{
 		printf("ERROR\n");
 	}
@@ -132,11 +132,16 @@ sinsp_parser::sinsp_parser(sinsp *inspector) :
 #if defined(HAS_CAPTURE)
 	m_sysdig_pid = getpid();
 #endif
+	m_inspector->m_partial_appevts_pool = new simple_lifo_queue<sinsp_partial_appevt>(128);
 }
 #endif
 
 sinsp_parser::~sinsp_parser()
 {
+	if(m_inspector->m_partial_appevts_pool != NULL)
+	{
+		delete m_inspector->m_partial_appevts_pool;
+	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -2048,10 +2053,10 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 		sinsp_evt_param *parinfo = evt->get_param(1);
 		char* data = parinfo->m_val;
 		uint32_t datalen = parinfo->m_len;
-		sinsp_usrevtparser* p = tinfo->m_userevt_parser;
+		sinsp_appevtparser* p = tinfo->m_userevt_parser;
 
 		p->process_event_data(data, datalen);
-		if(p->m_res != sinsp_usrevtparser::RES_OK)
+		if(p->m_res != sinsp_appevtparser::RES_OK)
 		{
 			evt->m_flt_flag = sinsp_evt::FF_FILTER_OUT;
 			return;

@@ -77,7 +77,7 @@ void sinsp_threadinfo::init()
 	m_latency = 0;
 #endif
 	m_ainfo = NULL;
-	m_userevt_parser = new sinsp_usrevtparser();
+	m_userevt_parser = new sinsp_appevtparser();
 }
 
 sinsp_threadinfo::~sinsp_threadinfo()

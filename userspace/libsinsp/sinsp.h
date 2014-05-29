@@ -92,6 +92,8 @@ class sinsp_parser;
 class sinsp_analyzer;
 class sinsp_filter;
 class sinsp_usrevtstorage;
+class sinsp_partial_appevt;
+template<typename OBJ> class simple_lifo_queue;
 
 vector<string> sinsp_split(const string &s, char delim);
 
@@ -550,10 +552,10 @@ private:
 	bool m_isdropping;
 
 	//
-	// list of ongoing user events
+	// App events 
 	//
-	list<sinsp_usrevtstorage*> m_partial_user_events;
-
+	list<sinsp_usrevtstorage*> m_partial_appevts;
+	simple_lifo_queue<sinsp_partial_appevt>* m_partial_appevts_pool;
 
 	friend class sinsp_parser;
 	friend class sinsp_analyzer;

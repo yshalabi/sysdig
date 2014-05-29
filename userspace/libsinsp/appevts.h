@@ -1,7 +1,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 // app event parser
 ///////////////////////////////////////////////////////////////////////////////
-class sinsp_usrevtparser
+class sinsp_appevtparser
 {
 public:
 	enum parse_result
@@ -12,15 +12,15 @@ public:
 		RES_TRUNCATED = 3,
 	};
 
-	sinsp_usrevtparser()
+	sinsp_appevtparser()
 	{
 		m_storage_size = 0;
 		m_storage = NULL;
-		m_res = sinsp_usrevtparser::RES_OK;
+		m_res = sinsp_appevtparser::RES_OK;
 		m_fragment_size = 0;
 	}
 
-	~sinsp_usrevtparser()
+	~sinsp_appevtparser()
 	{
 		if(m_storage)
 		{
@@ -28,7 +28,7 @@ public:
 		}
 	}
 
-	inline sinsp_usrevtparser::parse_result process_event_data(char *data, uint32_t datalen)
+	inline sinsp_appevtparser::parse_result process_event_data(char *data, uint32_t datalen)
 	{
 		ASSERT(data != NULL);
 
@@ -40,7 +40,7 @@ public:
 			m_storage = (char*)realloc(m_storage, m_fragment_size + datalen + 1);
 			if(m_storage == NULL)
 			{
-				throw sinsp_exception("memory allocation error in sinsp_usrevtparser::process_event_data.");
+				throw sinsp_exception("memory allocation error in sinsp_appevtparser::process_event_data.");
 			}
 			m_storage_size = m_fragment_size + datalen + 1;
 		}
@@ -58,7 +58,7 @@ public:
 		//
 		parse(m_storage, m_fragment_size + datalen);
 
-		if(m_res == sinsp_usrevtparser::RES_FAILED)
+		if(m_res == sinsp_appevtparser::RES_FAILED)
 		{
 			//
 			// Invalid syntax
@@ -67,7 +67,7 @@ public:
 			m_fullfragment_storage_str.clear();
 			return m_res;
 		}
-		else if(m_res == sinsp_usrevtparser::RES_TRUNCATED)
+		else if(m_res == sinsp_appevtparser::RES_TRUNCATED)
 		{
 			//
 			// Valid syntax, but the message is incomplete. Buffer it and wait for
@@ -109,7 +109,7 @@ public:
 		m_fragment_size = 0;
 		m_fullfragment_storage_str.clear();
 
-		return sinsp_usrevtparser::RES_OK;
+		return sinsp_appevtparser::RES_OK;
 	}
 
 	inline void parse(char* evtstr, uint32_t evtstrlen)
@@ -136,7 +136,7 @@ public:
 		// Skip the initial braket
 		//
 		m_res = skip_spaces(p, &delta);
-		if(m_res != sinsp_usrevtparser::RES_OK)
+		if(m_res != sinsp_appevtparser::RES_OK)
 		{
 			return;
 		}
@@ -144,7 +144,7 @@ public:
 
 		if(*(p++) != '[')
 		{
-			m_res = sinsp_usrevtparser::RES_FAILED;
+			m_res = sinsp_appevtparser::RES_FAILED;
 			return;
 		}
 
@@ -152,20 +152,20 @@ public:
 		// ID
 		//
 		m_res = skip_spaces(p, &delta);
-		if(m_res != sinsp_usrevtparser::RES_OK)
+		if(m_res != sinsp_appevtparser::RES_OK)
 		{
 			return;
 		}
 		p += delta;
 
 		m_res = parsenumber(p, &m_id, &delta);
-		if(m_res > sinsp_usrevtparser::RES_COMMA)
+		if(m_res > sinsp_appevtparser::RES_COMMA)
 		{
 			return;
 		}
 		p += delta;
 
-		if(m_res == sinsp_usrevtparser::RES_COMMA)
+		if(m_res == sinsp_appevtparser::RES_COMMA)
 		{
 			m_res = skip_spaces(p, &delta);
 		}
@@ -174,7 +174,7 @@ public:
 			m_res = skip_spaces_and_commas(p, &delta, 1);
 		}
 
-		if(m_res != sinsp_usrevtparser::RES_OK)
+		if(m_res != sinsp_appevtparser::RES_OK)
 		{
 			return;
 		}
@@ -195,12 +195,12 @@ public:
 		{
 			if(*p == 0)
 			{
-				m_res = sinsp_usrevtparser::RES_TRUNCATED;
+				m_res = sinsp_appevtparser::RES_TRUNCATED;
 				return;
 			}
 			else
 			{
-				m_res = sinsp_usrevtparser::RES_FAILED;
+				m_res = sinsp_appevtparser::RES_FAILED;
 				return;
 			}
 		}
@@ -210,14 +210,14 @@ public:
 		// First tag
 		//
 		m_res = skip_spaces_and_commas_and_sq_brakets(p, &delta);
-		if(m_res != sinsp_usrevtparser::RES_OK)
+		if(m_res != sinsp_appevtparser::RES_OK)
 		{
 			return;
 		}
 		p += delta;
 
 		m_res = parsestr_not_enforce(p, &tstr, &delta);
-		if(m_res != sinsp_usrevtparser::RES_OK)
+		if(m_res != sinsp_appevtparser::RES_OK)
 		{
 			return;
 		}
@@ -235,7 +235,7 @@ public:
 			while(true)
 			{
 				m_res = skip_spaces_and_commas(p, &delta, 0);
-				if(m_res != sinsp_usrevtparser::RES_OK)
+				if(m_res != sinsp_appevtparser::RES_OK)
 				{
 					return;
 				}
@@ -247,7 +247,7 @@ public:
 				}
 
 				m_res = parsestr(p, &tstr, &delta);
-				if(m_res != sinsp_usrevtparser::RES_OK)
+				if(m_res != sinsp_appevtparser::RES_OK)
 				{
 					return;
 				}
@@ -262,14 +262,14 @@ public:
 		// First argument
 		//
 		m_res = skip_spaces_and_commas_and_all_brakets(p, &delta);
-		if(m_res != sinsp_usrevtparser::RES_OK)
+		if(m_res != sinsp_appevtparser::RES_OK)
 		{
 			return;
 		}
 		p += delta;
 
 		m_res = parsestr_not_enforce(p, &tstr, &delta);
-		if(m_res != sinsp_usrevtparser::RES_OK)
+		if(m_res != sinsp_appevtparser::RES_OK)
 		{
 			return;
 		}
@@ -282,14 +282,14 @@ public:
 			m_tot_argnamelens += delta - 2;
 
 			m_res = skip_spaces_and_columns(p, &delta);
-			if(m_res != sinsp_usrevtparser::RES_OK)
+			if(m_res != sinsp_appevtparser::RES_OK)
 			{
 				return;
 			}
 			p += delta;
 
 			m_res = parsestr(p, &tstr, &delta);
-			if(m_res != sinsp_usrevtparser::RES_OK)
+			if(m_res != sinsp_appevtparser::RES_OK)
 			{
 				return;
 			}
@@ -304,7 +304,7 @@ public:
 			while(true)
 			{
 				m_res = skip_spaces_and_commas_and_cr_brakets(p, &delta);
-				if(m_res != sinsp_usrevtparser::RES_OK)
+				if(m_res != sinsp_appevtparser::RES_OK)
 				{
 					return;
 				}
@@ -317,7 +317,7 @@ public:
 				}
 
 				m_res = parsestr(p, &tstr, &delta);
-				if(m_res != sinsp_usrevtparser::RES_OK)
+				if(m_res != sinsp_appevtparser::RES_OK)
 				{
 					return;
 				}
@@ -327,14 +327,14 @@ public:
 				m_tot_argnamelens += delta - 2;
 
 				m_res = skip_spaces_and_columns(p, &delta);
-				if(m_res != sinsp_usrevtparser::RES_OK)
+				if(m_res != sinsp_appevtparser::RES_OK)
 				{
 					return;
 				}
 				p += delta;
 
 				m_res = parsestr(p, &tstr, &delta);
-				if(m_res != sinsp_usrevtparser::RES_OK)
+				if(m_res != sinsp_appevtparser::RES_OK)
 				{
 					return;
 				}
@@ -349,7 +349,7 @@ public:
 		// Terminating ]
 		//
 		m_res = skip_spaces(p, &delta);
-		if(m_res != sinsp_usrevtparser::RES_OK)
+		if(m_res != sinsp_appevtparser::RES_OK)
 		{
 			return;
 		}
@@ -359,16 +359,16 @@ public:
 		{
 			if(*p == 0)
 			{
-				m_res = sinsp_usrevtparser::RES_TRUNCATED;
+				m_res = sinsp_appevtparser::RES_TRUNCATED;
 			}
 			else
 			{
-				m_res = sinsp_usrevtparser::RES_FAILED;
+				m_res = sinsp_appevtparser::RES_FAILED;
 			}
 			return;
 		}
 
-		m_res = sinsp_usrevtparser::RES_OK;
+		m_res = sinsp_appevtparser::RES_OK;
 		return;
 	}
 
@@ -394,14 +394,14 @@ VISIBILITY_PRIVATE
 		{
 			if(*p == 0)
 			{
-				return sinsp_usrevtparser::RES_TRUNCATED;
+				return sinsp_appevtparser::RES_TRUNCATED;
 			}
 
 			p++;
 		}
 
 		*delta = p - start;
-		return sinsp_usrevtparser::RES_OK;
+		return sinsp_appevtparser::RES_OK;
 	}
 
 	inline parse_result skip_spaces_and_commas(char* p, uint32_t* delta, uint32_t n_expected_commas)
@@ -422,7 +422,7 @@ VISIBILITY_PRIVATE
 			}
 			else if(*p == 0)
 			{
-				return sinsp_usrevtparser::RES_TRUNCATED;
+				return sinsp_appevtparser::RES_TRUNCATED;
 			}
 			else
 			{
@@ -434,11 +434,11 @@ VISIBILITY_PRIVATE
 
 		if(nc < n_expected_commas)
 		{
-			return sinsp_usrevtparser::RES_FAILED;
+			return sinsp_appevtparser::RES_FAILED;
 		}
 
 		*delta = p - start;
-		return sinsp_usrevtparser::RES_OK;
+		return sinsp_appevtparser::RES_OK;
 	}
 
 	inline parse_result skip_spaces_and_columns(char* p, uint32_t* delta)
@@ -450,7 +450,7 @@ VISIBILITY_PRIVATE
 		{
 			if(*p == 0)
 			{
-				return sinsp_usrevtparser::RES_TRUNCATED;
+				return sinsp_appevtparser::RES_TRUNCATED;
 			}
 			else if(*p == ':')
 			{
@@ -462,11 +462,11 @@ VISIBILITY_PRIVATE
 
 		if(nc != 1)
 		{
-			return sinsp_usrevtparser::RES_FAILED;
+			return sinsp_appevtparser::RES_FAILED;
 		}
 
 		*delta = p - start;
-		return sinsp_usrevtparser::RES_OK;
+		return sinsp_appevtparser::RES_OK;
 	}
 
 	inline parse_result skip_spaces_and_commas_and_sq_brakets(char* p, uint32_t* delta)
@@ -479,7 +479,7 @@ VISIBILITY_PRIVATE
 		{
 			if(*p == 0)
 			{
-				return sinsp_usrevtparser::RES_TRUNCATED;
+				return sinsp_appevtparser::RES_TRUNCATED;
 			}
 			else if(*p == ',')
 			{
@@ -502,11 +502,11 @@ VISIBILITY_PRIVATE
 
 		if(nc != 1 || nosb != 1)
 		{
-			return sinsp_usrevtparser::RES_FAILED;
+			return sinsp_appevtparser::RES_FAILED;
 		}
 
 		*delta = p - start;
-		return sinsp_usrevtparser::RES_OK;
+		return sinsp_appevtparser::RES_OK;
 	}
 
 	inline parse_result skip_spaces_and_commas_and_cr_brakets(char* p, uint32_t* delta)
@@ -520,7 +520,7 @@ VISIBILITY_PRIVATE
 		{
 			if(*p == 0)
 			{
-				return sinsp_usrevtparser::RES_TRUNCATED;
+				return sinsp_appevtparser::RES_TRUNCATED;
 			}
 			else if(*p == ',')
 			{
@@ -540,11 +540,11 @@ VISIBILITY_PRIVATE
 
 		if(!((nc == 1 && nocb == 1) || (nc == 1 && nccb == 1) || (nccb == 1 && *p == ']')))
 		{
-			return sinsp_usrevtparser::RES_FAILED;
+			return sinsp_appevtparser::RES_FAILED;
 		}
 
 		*delta = p - start;
-		return sinsp_usrevtparser::RES_OK;
+		return sinsp_appevtparser::RES_OK;
 	}
 
 	inline parse_result skip_spaces_and_commas_and_all_brakets(char* p, uint32_t* delta)
@@ -558,7 +558,7 @@ VISIBILITY_PRIVATE
 		{
 			if(*p == 0)
 			{
-				return sinsp_usrevtparser::RES_TRUNCATED;
+				return sinsp_appevtparser::RES_TRUNCATED;
 			}
 			else if(*p == ',')
 			{
@@ -585,18 +585,18 @@ VISIBILITY_PRIVATE
 
 		if(nc != 1 || nosb != 1)
 		{
-			return sinsp_usrevtparser::RES_FAILED;
+			return sinsp_appevtparser::RES_FAILED;
 		}
 		else if(nocb != 1)
 		{
 			if(*p != ']')
 			{
-				return sinsp_usrevtparser::RES_FAILED;
+				return sinsp_appevtparser::RES_FAILED;
 			}
 		}
 
 		*delta = p - start;
-		return sinsp_usrevtparser::RES_OK;
+		return sinsp_appevtparser::RES_OK;
 	}
 
 	inline parse_result parsestr(char* p, char** res, uint32_t* delta)
@@ -609,11 +609,11 @@ VISIBILITY_PRIVATE
 			*delta = (p - initial + 1);
 			if(*p == 0)
 			{
-				return sinsp_usrevtparser::RES_TRUNCATED;
+				return sinsp_appevtparser::RES_TRUNCATED;
 			}
 			else
 			{
-				return sinsp_usrevtparser::RES_FAILED;
+				return sinsp_appevtparser::RES_FAILED;
 			}
 		}
 
@@ -625,7 +625,7 @@ VISIBILITY_PRIVATE
 			if(*p == 0)
 			{
 				*delta = (p - initial + 1);
-				return sinsp_usrevtparser::RES_TRUNCATED;
+				return sinsp_appevtparser::RES_TRUNCATED;
 			}
 
 			p++;
@@ -634,34 +634,34 @@ VISIBILITY_PRIVATE
 		*p = 0;
 
 		*delta = (p - initial + 1);
-		return sinsp_usrevtparser::RES_OK;
+		return sinsp_appevtparser::RES_OK;
 	}
 
 	inline parse_result parsestr_not_enforce(char* p, char** res, uint32_t* delta)
 	{
-		sinsp_usrevtparser::parse_result psres = parsestr(p, res, delta);
+		sinsp_appevtparser::parse_result psres = parsestr(p, res, delta);
 
-		if(psres == sinsp_usrevtparser::RES_FAILED)
+		if(psres == sinsp_appevtparser::RES_FAILED)
 		{
 			if(*(p + *delta) == ']')
 			{
 				*res = NULL;
-				return sinsp_usrevtparser::RES_OK;
+				return sinsp_appevtparser::RES_OK;
 			}
 		}
-		else if(psres == sinsp_usrevtparser::RES_TRUNCATED)
+		else if(psres == sinsp_appevtparser::RES_TRUNCATED)
 		{
 			return psres;
 		}
 
-		return sinsp_usrevtparser::RES_OK;
+		return sinsp_appevtparser::RES_OK;
 	}
 
 	inline parse_result parsenumber(char* p, char** res, uint32_t* delta)
 	{
 /*
 		char* start = p;
-		sinsp_usrevtparser::parse_result retval = sinsp_usrevtparser::RES_OK;
+		sinsp_appevtparser::parse_result retval = sinsp_appevtparser::RES_OK;
 		uint64_t val = 0;
 
 		while(*p >= '0' && *p <= '9')
@@ -672,15 +672,15 @@ VISIBILITY_PRIVATE
 
 		if(*p == ',')
 		{
-			retval = sinsp_usrevtparser::RES_COMMA;
+			retval = sinsp_appevtparser::RES_COMMA;
 		}
 		else if(*p != 0 && *p != ' ')
 		{
-			return sinsp_usrevtparser::RES_FAILED;
+			return sinsp_appevtparser::RES_FAILED;
 		}
 		else if(*p == 0)
 		{
-			return sinsp_usrevtparser::RES_TRUNCATED;
+			return sinsp_appevtparser::RES_TRUNCATED;
 		}
 
 
@@ -691,7 +691,7 @@ VISIBILITY_PRIVATE
 		return retval;
 */
 		char* start = p;
-		sinsp_usrevtparser::parse_result retval = sinsp_usrevtparser::RES_OK;
+		sinsp_appevtparser::parse_result retval = sinsp_appevtparser::RES_OK;
 
 		*res = p;
 
@@ -702,15 +702,15 @@ VISIBILITY_PRIVATE
 
 		if(*p == ',')
 		{
-			retval = sinsp_usrevtparser::RES_COMMA;
+			retval = sinsp_appevtparser::RES_COMMA;
 		}
 		else if(*p != 0 && *p != ' ')
 		{
-			return sinsp_usrevtparser::RES_FAILED;
+			return sinsp_appevtparser::RES_FAILED;
 		}
 		else if(*p == 0)
 		{
-			return sinsp_usrevtparser::RES_TRUNCATED;
+			return sinsp_appevtparser::RES_TRUNCATED;
 		}
 
 
@@ -723,7 +723,7 @@ VISIBILITY_PRIVATE
 	char* m_storage;
 	uint32_t m_storage_size;
 	uint32_t m_fragment_size;
-	sinsp_usrevtparser::parse_result m_res;
+	sinsp_appevtparser::parse_result m_res;
 	string m_fullfragment_storage_str;
 
 	friend class sinsp_parser;
@@ -756,7 +756,7 @@ public:
 		}
 	}
 
-	void init(sinsp_usrevtparser* details)
+	void init(sinsp_appevtparser* details)
 	{
 		vector<char*>::iterator it;
 		vector<uint32_t>::iterator sit;
