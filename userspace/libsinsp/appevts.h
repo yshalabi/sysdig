@@ -1,3 +1,78 @@
+/*
+Copyright (C) 2013-2014 Draios inc.
+
+This file is part of sysdig.
+
+sysdig is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License version 2 as
+published by the Free Software Foundation.
+
+sysdig is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with sysdig.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+#define UESTORAGE_INITIAL_BUFSIZE 10
+
+///////////////////////////////////////////////////////////////////////////////
+// app table entry
+///////////////////////////////////////////////////////////////////////////////
+class sinsp_partial_appevt
+{
+public:
+	sinsp_partial_appevt()
+	{
+		m_tags_storage = (char*)malloc(UESTORAGE_INITIAL_BUFSIZE);
+		m_args_storage = (char*)malloc(UESTORAGE_INITIAL_BUFSIZE);
+		m_tags_storage_size = UESTORAGE_INITIAL_BUFSIZE;
+		m_args_storage_size = UESTORAGE_INITIAL_BUFSIZE;
+	}
+
+	~sinsp_partial_appevt()
+	{
+		if(m_tags_storage)
+		{
+			free(m_tags_storage);
+		}
+
+		if(m_args_storage)
+		{
+			free(m_args_storage); 
+		}
+	}
+
+	inline bool compare(sinsp_partial_appevt* other)
+	{
+		if(m_id != other->m_id)
+		{
+			return false;
+		}
+
+		if(memcmp(m_tags_storage, 
+			other->m_tags_storage,
+			MIN(m_tags_len, other->m_tags_len)) == 0)
+		{
+			return true;
+		}
+
+		return false;
+	}
+
+	char* m_tags_storage;
+	char* m_args_storage;
+	uint32_t m_tags_len;
+	uint32_t m_args_len;
+	uint32_t m_tags_storage_size;
+	uint32_t m_args_storage_size;
+	uint64_t m_id; 
+
+	uint64_t m_time;
+};
+
 ///////////////////////////////////////////////////////////////////////////////
 // app event parser
 ///////////////////////////////////////////////////////////////////////////////
@@ -12,8 +87,9 @@ public:
 		RES_TRUNCATED = 3,
 	};
 
-	sinsp_appevtparser()
+	sinsp_appevtparser(sinsp *inspector)
 	{
+		m_inspector = inspector;
 		m_storage_size = 0;
 		m_storage = NULL;
 		m_res = sinsp_appevtparser::RES_OK;
@@ -28,7 +104,7 @@ public:
 		}
 	}
 
-	inline sinsp_appevtparser::parse_result process_event_data(char *data, uint32_t datalen)
+	inline sinsp_appevtparser::parse_result process_event_data(char *data, uint32_t datalen, uint64_t ts)
 	{
 		ASSERT(data != NULL);
 
@@ -108,6 +184,42 @@ public:
 
 		m_fragment_size = 0;
 		m_fullfragment_storage_str.clear();
+
+		//
+		// If this is an enter event, allocate a sinsp_partial_appevt object and
+		// push it to the list
+		//
+		if(m_is_enter)
+		{
+			sinsp_partial_appevt* pae = m_inspector->m_partial_appevts_pool->pop();
+			if(pae == NULL)
+			{
+				return sinsp_appevtparser::RES_OK;
+			}
+
+			init_partial_appevt(pae);
+			pae->m_time = ts;
+			m_inspector->m_partial_appevts_list.push_front(pae);
+		}
+		else
+		{
+			list<sinsp_partial_appevt*>* partial_appevts_list = &m_inspector->m_partial_appevts_list;
+			list<sinsp_partial_appevt*>::iterator it;
+
+			init_partial_appevt(&m_exit_pae);
+
+			for(it = partial_appevts_list->begin(); it != partial_appevts_list->end(); ++it)
+			{
+				if(m_exit_pae.compare(*it) == true)
+				{
+					m_exit_pae.m_time = ts - (*it)->m_time;
+					partial_appevts_list->erase(it);
+					return sinsp_appevtparser::RES_OK;
+				}
+			}
+
+			ASSERT(false);
+		}
 
 		return sinsp_appevtparser::RES_OK;
 	}
@@ -373,7 +485,7 @@ public:
 	}
 
 	bool m_is_enter;
-	char* m_id;
+	uint64_t m_id;
 	vector<char*> m_tags;
 	vector<char*> m_argnames;
 	vector<char*> m_argvals;
@@ -657,9 +769,8 @@ VISIBILITY_PRIVATE
 		return sinsp_appevtparser::RES_OK;
 	}
 
-	inline parse_result parsenumber(char* p, char** res, uint32_t* delta)
+	inline parse_result parsenumber(char* p, uint64_t* res, uint32_t* delta)
 	{
-/*
 		char* start = p;
 		sinsp_appevtparser::parse_result retval = sinsp_appevtparser::RES_OK;
 		uint64_t val = 0;
@@ -689,7 +800,11 @@ VISIBILITY_PRIVATE
 		*res = val;
 		*delta = (p - start + 1);
 		return retval;
-*/
+	}
+
+/*
+	inline parse_result parsenumber(char* p, char** res, uint32_t* delta)
+	{
 		char* start = p;
 		sinsp_appevtparser::parse_result retval = sinsp_appevtparser::RES_OK;
 
@@ -719,69 +834,52 @@ VISIBILITY_PRIVATE
 		*delta = (p - start + 1);
 		return retval;
 	}
+*/
+	inline void init_partial_appevt(sinsp_partial_appevt* pae)
+	{
+		vector<char*>::iterator it;
+		vector<uint32_t>::iterator sit;
 
+		//
+		// Store the ID
+		//
+		pae->m_id = m_id;
+
+		//
+		// Copy the tags
+		//
+		uint32_t ntags = m_tags.size();
+		uint32_t encoded_tags_len = m_tot_taglens + ntags + 1;
+
+		if(pae->m_tags_storage_size < encoded_tags_len)
+		{
+			pae->m_tags_storage = (char*)realloc(pae->m_tags_storage, encoded_tags_len);
+			pae->m_tags_storage_size = encoded_tags_len;
+		}
+
+		ASSERT(m_tags.size() == m_taglens.size());
+		ASSERT(m_argnames.size() == m_argnamelens.size());
+		ASSERT(m_argvals.size() == m_argvallens.size());
+		
+		char* p = pae->m_tags_storage;
+		for(it = m_tags.begin(), sit = m_taglens.begin(); 
+			it != m_tags.end(); ++it, ++sit)
+		{
+			memcpy(p, *it, (*sit) + 1);
+			p += (*sit) + 1;
+		}
+
+		*p++ = 0;
+		pae->m_tags_len = p - pae->m_tags_storage;
+	}
+
+	sinsp *m_inspector;
 	char* m_storage;
 	uint32_t m_storage_size;
 	uint32_t m_fragment_size;
 	sinsp_appevtparser::parse_result m_res;
 	string m_fullfragment_storage_str;
+	sinsp_partial_appevt m_exit_pae;
 
 	friend class sinsp_parser;
-};
-
-///////////////////////////////////////////////////////////////////////////////
-// app table entry
-///////////////////////////////////////////////////////////////////////////////
-class sinsp_partial_appevt
-{
-public:
-	sinsp_partial_appevt()
-	{
-		m_tags = (char*)malloc(UESTORAGE_INITIAL_BUFSIZE);
-		m_args = (char*)malloc(UESTORAGE_INITIAL_BUFSIZE);
-		m_tags_size = UESTORAGE_INITIAL_BUFSIZE;
-		m_args_size = UESTORAGE_INITIAL_BUFSIZE;
-	}
-
-	~sinsp_partial_appevt()
-	{
-		if(m_tags)
-		{
-			free(m_tags);
-		}
-
-		if(m_args)
-		{
-			free(m_args); 
-		}
-	}
-
-	void init(sinsp_appevtparser* details)
-	{
-		vector<char*>::iterator it;
-		vector<uint32_t>::iterator sit;
-
-		if(m_tags_size < details->m_tot_argvallens)
-		{
-			m_tags = (char*)realloc(m_tags, details->m_tot_argvallens);
-			m_tags_size = details->m_tot_argvallens;
-		}
-
-		ASSERT(details->m_tags.size() == details->m_taglens.size());
-		ASSERT(details->m_argnames.size() == details->m_argnamelens.size());
-		ASSERT(details->m_argvals.size() == details->m_argvallens.size());
-		
-		char* p = m_tags;
-		for(it = details->m_tags.begin(), sit = details->m_taglens.begin(); 
-			it != details->m_tags.end(); ++it, ++sit)
-		{
-			memcpy(p, *it, *sit);
-			p += *sit;
-		}
-	}
-
-	char* m_tags;
-	char* m_args;
-	uint32_t m_tags_size;
-	uint32_t m_args_size;
 };

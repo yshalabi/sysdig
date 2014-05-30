@@ -27,8 +27,6 @@ class sinsp_threadtable_listener;
 class thread_analyzer_info;
 class sinsp_appevtparser;
 
-#define UESTORAGE_INITIAL_BUFSIZE 256
-
 typedef struct erase_fd_params
 {
 	bool m_remove_from_table;

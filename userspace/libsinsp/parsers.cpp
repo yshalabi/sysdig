@@ -59,62 +59,35 @@ sinsp_parser::sinsp_parser(sinsp *inspector) :
 #if defined(HAS_CAPTURE)
 	m_sysdig_pid = getpid();
 #endif
+	m_inspector->m_partial_appevts_pool = new simple_lifo_queue<sinsp_partial_appevt>(128);
 
 
 
 
 char doc[] = "[12435, >, [\"mysql\", \"query\", \"init\"], [{\"argname1\":\"argval1\"}, {\"argname2\":\"argval2\"}, {\"argname3\":\"argval3\"}]]";
-char doc1[] = "";
-char doc2[] = "[1243";
-char doc3[] = "5, >, [\"mysql\", \"query\", \"init\"], [{\"argname1\":\"argval1\"}, {\"argname2\":\"argval2\"}, {\"argname3\":\"argval3\"}]]";
-char tb[2];
-tb[1] = 0;
-sinsp_appevtparser p;
+char doc1[] = "[12435, <, [\"mysql\", \"query\", \"init\"], []]";
+sinsp_appevtparser p(inspector);
 printf("1\n");
-m_inspector->m_partial_appevts_pool = new simple_lifo_queue<sinsp_partial_appevt>(128);
 
 float cpu_time = ((float)clock ()) / CLOCKS_PER_SEC;
 
 for(uint64_t j = 0; j < 10000000; j++)
 {
-//	p.process_event_data(doc, sizeof(doc) - 1);
-/*
-int pi = sizeof(doc);
-
-	uint32_t k;
-	for(k = 0; k < sizeof(doc) - 2; k++)
-	{
-		tb[0] = doc[k];
-		p.process_event_data_test(tb, 1);
-		if(p.m_res != sinsp_appevtparser::RES_TRUNCATED)
-		{
-			int a = 0;
-		}
-	}
-
-	tb[0] = doc[k++];
-	p.process_event_data_test(tb, 1);
-
-	p.process_event_data(doc1, sizeof(doc1) - 1);
-	p.process_event_data(doc2, sizeof(doc2) - 1);
-	p.process_event_data(doc3, sizeof(doc3) - 1);
-*/
-	p.process_event_data(doc, sizeof(doc) - 1);
+	p.process_event_data(doc, sizeof(doc) - 1, 10);
 
 	if(p.m_res != sinsp_appevtparser::RES_OK)
 	{
 		printf("ERROR\n");
 	}
 
-/*
-	sinsp_partial_appevt* st = ueq.pop();
+	p.process_event_data(doc1, sizeof(doc1) - 1, 20);
 
-	if(st != NULL)
+	if(p.m_res != sinsp_appevtparser::RES_OK)
 	{
-		st->init(&p);
+		printf("ERROR\n");
 	}
-*/	
 }
+
 cpu_time = ((float)clock()/ CLOCKS_PER_SEC) - cpu_time;
 printf ("tempo: %5.2f\n", cpu_time);
 
@@ -2055,7 +2028,7 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 		uint32_t datalen = parinfo->m_len;
 		sinsp_appevtparser* p = tinfo->m_userevt_parser;
 
-		p->process_event_data(data, datalen);
+		p->process_event_data(data, datalen, evt->get_ts());
 		if(p->m_res != sinsp_appevtparser::RES_OK)
 		{
 			evt->m_flt_flag = sinsp_evt::FF_FILTER_OUT;
