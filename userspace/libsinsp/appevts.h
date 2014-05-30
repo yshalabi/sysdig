@@ -16,7 +16,7 @@ You should have received a copy of the GNU General Public License
 along with sysdig.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#define UESTORAGE_INITIAL_BUFSIZE 10
+#define UESTORAGE_INITIAL_BUFSIZE 256
 
 ///////////////////////////////////////////////////////////////////////////////
 // app table entry
@@ -69,6 +69,7 @@ public:
 	uint32_t m_tags_storage_size;
 	uint32_t m_args_storage_size;
 	uint64_t m_id; 
+	vector<char*> m_tags;
 
 	uint64_t m_time;
 };
@@ -213,6 +214,7 @@ public:
 				if(m_exit_pae.compare(*it) == true)
 				{
 					m_exit_pae.m_time = ts - (*it)->m_time;
+					m_inspector->m_partial_appevts_pool->push(*it);
 					partial_appevts_list->erase(it);
 					return sinsp_appevtparser::RES_OK;
 				}

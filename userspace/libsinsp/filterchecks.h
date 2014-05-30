@@ -446,13 +446,17 @@ class sinsp_filter_check_appevt : public sinsp_filter_check
 public:
 	enum check_type
 	{
-		TYPE_GID,
-		TYPE_TAG,
+		TYPE_ID = 0,
+		TYPE_TAGS,
 	};
 
 	sinsp_filter_check_appevt();
 	sinsp_filter_check* allocate_new();
 	uint8_t* extract(sinsp_evt *evt, OUT uint32_t* len);
+
+private:
+	char* m_storage;
+	uint32_t m_storage_size;
 };
 
 //

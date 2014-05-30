@@ -26,6 +26,7 @@ along with sysdig.  If not, see <http://www.gnu.org/licenses/>.
 #ifdef HAS_FILTERING
 #include "filter.h"
 #include "filterchecks.h"
+#include "appevts.h"
 
 extern sinsp_evttables g_infotables;
 
@@ -2140,8 +2141,10 @@ uint8_t* sinsp_filter_check_group::extract(sinsp_evt *evt, OUT uint32_t* len)
 ///////////////////////////////////////////////////////////////////////////////
 const filtercheck_field_info sinsp_filter_check_appevt_fields[] =
 {
-	{PT_UINT64, EPF_NONE, PF_DEC, "group.gid", "group ID."},
-	{PT_CHARBUF, EPF_NONE, PF_NA, "group.name", "group name."},
+	{PT_UINT64, EPF_NONE, PF_DEC, "appevt.id", "event ID."},
+	{PT_CHARBUF, EPF_NONE, PF_NA, "appevt.tags", "comma-separated list of event tags."},
+	{PT_CHARBUF, EPF_NONE, PF_NA, "appevt.args", "comma-separated list of event arguments."},
+	{PT_RELTIME, EPF_NONE, PF_DEC, "appevt.latency", "delta between an exit event and the correspondent enter event."},
 };
 
 sinsp_filter_check_appevt::sinsp_filter_check_appevt()
@@ -2149,6 +2152,13 @@ sinsp_filter_check_appevt::sinsp_filter_check_appevt()
 	m_info.m_name = "app";
 	m_info.m_fields = sinsp_filter_check_appevt_fields;
 	m_info.m_nfiedls = sizeof(sinsp_filter_check_appevt_fields) / sizeof(sinsp_filter_check_appevt_fields[0]);
+
+	m_storage_size = UESTORAGE_INITIAL_BUFSIZE;
+	m_storage = (char*)malloc(m_storage_size);
+	if(m_storage == NULL)
+	{
+		throw sinsp_exception("memory allocation error in sinsp_filter_check_appevt::sinsp_filter_check_appevt");
+	}
 }
 
 sinsp_filter_check* sinsp_filter_check_appevt::allocate_new()
@@ -2158,6 +2168,7 @@ sinsp_filter_check* sinsp_filter_check_appevt::allocate_new()
 
 uint8_t* sinsp_filter_check_appevt::extract(sinsp_evt *evt, OUT uint32_t* len)
 {
+	sinsp_appevtparser* aep;
 	sinsp_threadinfo* tinfo = evt->get_thread_info();
 
 	if(tinfo == NULL)
@@ -2165,35 +2176,36 @@ uint8_t* sinsp_filter_check_appevt::extract(sinsp_evt *evt, OUT uint32_t* len)
 		return NULL;
 	}
 
+	aep = tinfo->m_userevt_parser;
+
 	switch(m_field_id)
 	{
-	case TYPE_GID:
-		return (uint8_t*)&tinfo->m_gid;
-	case TYPE_TAG:
+	case TYPE_ID:
+		return (uint8_t*)&aep->m_id;
+	case TYPE_TAGS:
 		{
-			unordered_map<uint32_t, scap_groupinfo*>::iterator it;
+			vector<char*>::iterator it;
+			vector<uint32_t>::iterator sit;
 
-			ASSERT(m_inspector != NULL);
-			unordered_map<uint32_t, scap_groupinfo*>* grouplist = 
-				(unordered_map<uint32_t, scap_groupinfo*>*)m_inspector->get_grouplist();
-			ASSERT(grouplist->size() != 0);
+			uint32_t ntags = aep->m_tags.size();
+			uint32_t encoded_tags_len = aep->m_tot_taglens + ntags + 1;
 
-			if(tinfo->m_gid == 0xffffffff)
+			if(m_storage_size < encoded_tags_len)
 			{
-				return NULL;
+				m_storage = (char*)realloc(m_storage, encoded_tags_len);
+				m_storage_size = encoded_tags_len;
 			}
 
-			it = grouplist->find(tinfo->m_gid);
-			if(it == grouplist->end())
+			char* p = m_storage;
+
+			for(it = aep->m_tags.begin(), sit = aep->m_taglens.begin(); 
+				it != aep->m_tags.end(); ++it, ++sit)
 			{
-				ASSERT(false);
-				return NULL;
+				memcpy(p, *it, (*sit) + 1);
+				p += (*sit) + 1;
 			}
 
-			scap_groupinfo* ginfo = it->second;
-			ASSERT(ginfo != NULL);
-
-			return (uint8_t*)ginfo->name;
+			return (uint8_t*)m_storage;
 		}
 	default:
 		ASSERT(false);
