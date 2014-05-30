@@ -426,7 +426,7 @@ class sinsp_filter_check_group : public sinsp_filter_check
 public:
 	enum check_type
 	{
-		TYPE_GID,
+		TYPE_GID = 0,
 		TYPE_NAME,
 	};
 
@@ -448,13 +448,21 @@ public:
 	{
 		TYPE_ID = 0,
 		TYPE_TAGS,
+		TYPE_TAG,
+		TYPE_ARGS,
+		TYPE_LATENCY,
 	};
 
 	sinsp_filter_check_appevt();
 	sinsp_filter_check* allocate_new();
+	int32_t parse_field_name(const char* str);
 	uint8_t* extract(sinsp_evt *evt, OUT uint32_t* len);
 
 private:
+	int32_t extract_arg(string fldname, string val, OUT const struct ppm_param_info** parinfo);
+
+	int32_t m_argid;
+	string m_argname;
 	char* m_storage;
 	uint32_t m_storage_size;
 };

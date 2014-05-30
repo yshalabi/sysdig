@@ -226,7 +226,7 @@ public:
 				}
 			}
 
-//			ASSERT(false);
+			ASSERT(false);
 		}
 
 		return sinsp_appevtparser::RES_OK;

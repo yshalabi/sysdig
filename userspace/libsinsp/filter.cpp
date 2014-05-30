@@ -1327,7 +1327,7 @@ void sinsp_filter::compile(const string& fltstr)
 			pop_expression();
 			break;
 		case 'o':
-			if(m_scanpos != 0)
+			if(m_scanpos != 0 && m_state != ST_NEED_EXPRESSION)
 			{
 				if(next() == 'r')
 				{
@@ -1353,7 +1353,7 @@ void sinsp_filter::compile(const string& fltstr)
 
 			break;
 		case 'a':
-			if(m_scanpos != 0)
+			if(m_scanpos != 0 && m_state != ST_NEED_EXPRESSION)
 			{
 				if(next() == 'n' && next() == 'd')
 				{

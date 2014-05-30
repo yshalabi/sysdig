@@ -2143,6 +2143,7 @@ const filtercheck_field_info sinsp_filter_check_appevt_fields[] =
 {
 	{PT_UINT64, EPF_NONE, PF_DEC, "appevt.id", "event ID."},
 	{PT_CHARBUF, EPF_NONE, PF_NA, "appevt.tags", "comma-separated list of event tags."},
+	{PT_CHARBUF, EPF_NONE, PF_NA, "appevt.tag", "one of the event tags specified by number. E.g. 'appevt.tag[1]'."},
 	{PT_CHARBUF, EPF_NONE, PF_NA, "appevt.args", "comma-separated list of event arguments."},
 	{PT_RELTIME, EPF_NONE, PF_DEC, "appevt.latency", "delta between an exit event and the correspondent enter event."},
 };
@@ -2166,10 +2167,83 @@ sinsp_filter_check* sinsp_filter_check_appevt::allocate_new()
 	return (sinsp_filter_check*) new sinsp_filter_check_appevt();
 }
 
+int32_t sinsp_filter_check_appevt::extract_arg(string fldname, string val, OUT const struct ppm_param_info** parinfo)
+{
+	uint32_t parsed_len = 0;
+
+	//
+	// 'arg' and 'resarg' are handled in a custom way
+	//
+	if(val[fldname.size()] == '[')
+	{
+		if(parinfo != NULL)
+		{
+			throw sinsp_exception("evt.arg fields must be expressed explicitly");
+		}
+
+		parsed_len = val.find(']');
+		string numstr = val.substr(fldname.size() + 1, parsed_len - fldname.size() - 1);
+		m_argid = sinsp_numparser::parsed32(numstr);
+		parsed_len++;
+	}
+	else if(val[fldname.size()] == '.')
+	{
+		const struct ppm_param_info* pi = 
+			sinsp_utils::find_longest_matching_evt_param(val.substr(fldname.size() + 1));
+
+		if(pi == NULL)
+		{
+			throw sinsp_exception("unknown event argument " + val.substr(fldname.size() + 1));
+		}
+
+		m_argname = pi->name;
+		parsed_len = fldname.size() + strlen(pi->name) + 1;
+		m_argid = -1;
+
+		if(parinfo != NULL)
+		{
+			*parinfo = pi;
+		}
+	}
+	else
+	{
+		throw sinsp_exception("filter syntax error: " + val);
+	}
+
+	return parsed_len; 
+}
+
+int32_t sinsp_filter_check_appevt::parse_field_name(const char* str)
+{
+	string val(str);
+
+	//
+	// A couple of fields are handled in a custom way
+	//
+	if(string(val, 0, sizeof("appevt.tag") - 1) == "appevt.tag" &&
+		string(val, 0, sizeof("appevt.tags") - 1) != "appevt.tags")
+	{
+		m_field_id = TYPE_TAG;
+		m_field = &m_info.m_fields[m_field_id];
+
+		return extract_arg("appevt.tag", val, NULL);
+	}
+	else
+	{
+		return sinsp_filter_check::parse_field_name(str);
+	}
+}
+
 uint8_t* sinsp_filter_check_appevt::extract(sinsp_evt *evt, OUT uint32_t* len)
 {
 	sinsp_appevtparser* aep;
 	sinsp_threadinfo* tinfo = evt->get_thread_info();
+	uint16_t etype = evt->get_type();
+
+	if(etype != PPME_USER_E && etype != PPME_USER_X)
+	{
+		return NULL;
+	}
 
 	if(tinfo == NULL)
 	{
@@ -2206,8 +2280,41 @@ uint8_t* sinsp_filter_check_appevt::extract(sinsp_evt *evt, OUT uint32_t* len)
 			for(it = aep->m_tags.begin(), sit = aep->m_taglens.begin(); 
 				it != aep->m_tags.end(); ++it, ++sit)
 			{
-				memcpy(p, *it, (*sit) + 1);
-				p += (*sit) + 1;
+				memcpy(p, *it, (*sit));
+				p += (*sit);
+				*p++ = ',';
+			}
+
+			if(p != m_storage)
+			{
+				*--p = 0;
+			}
+			else
+			{
+				*p = 0;
+			}
+
+			return (uint8_t*)m_storage;
+		}
+	case TYPE_TAG:
+		{
+			m_storage = NULL;
+
+			if(m_argid >= 0)
+			{
+				if(m_argid < aep->m_tags.size())
+				{
+					m_storage = aep->m_tags[m_argid];
+				}
+			}
+			else
+			{
+				int32_t id = (int32_t)aep->m_tags.size() + m_argid;
+
+				if(id >= 0)
+				{
+					m_storage = aep->m_tags[id];
+				}
 			}
 
 			return (uint8_t*)m_storage;
