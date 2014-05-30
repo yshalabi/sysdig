@@ -47,7 +47,7 @@ bool should_drop(sinsp_evt *evt);
 
 
 
-#if 1
+#if 0
 #include <time.h>
 
 sinsp_parser::sinsp_parser(sinsp *inspector) :
@@ -221,6 +221,7 @@ void sinsp_parser::process_event(sinsp_evt *evt)
 				return;
 			}
 		}
+
 		break;
 	case PPME_SYSCALL_READ_X:
 	case PPME_SYSCALL_WRITE_X:
@@ -2036,7 +2037,7 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 		}
 
 		p->process_event_data(data, datalen, evt->get_ts());
-		if(p->m_res != sinsp_appevtparser::RES_OK)
+		if(p->m_res == sinsp_appevtparser::RES_TRUNCATED)
 		{
 			evt->m_flt_flag = sinsp_evt::FF_FILTER_OUT;
 			return;
@@ -2051,6 +2052,25 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 		uint8_t* fakeevt_storage = (uint8_t*)m_fake_userevt;
 		m_fake_userevt->ts = evt->m_pevt->ts;
 		m_fake_userevt->tid = evt->m_pevt->tid;
+
+		if(p->m_res == sinsp_appevtparser::RES_FAILED)
+		{
+			m_fake_userevt->type = PPME_USER_E;
+
+			uint16_t *lens = (uint16_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr));
+			lens[0] = 8;
+			lens[1] = 8;
+			lens[2] = 8;
+
+			p->m_tags.clear();
+			m_appevt_error_string = "invalid app event " + string(data, datalen);
+			p->m_tags.push_back((char*)m_appevt_error_string.c_str());
+			*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 6) = 0;
+			*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 14) = (uint64_t)&p->m_tags;
+			*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 22) = (uint64_t)&p->m_args;
+			
+			return;
+		}
 
 		if(p->m_type_str[0] == '>')
 		{
