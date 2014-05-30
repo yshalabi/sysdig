@@ -2053,7 +2053,32 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 		m_fake_userevt->ts = evt->m_pevt->ts;
 		m_fake_userevt->tid = evt->m_pevt->tid;
 
-		if(p->m_res == sinsp_appevtparser::RES_FAILED)
+		if(p->m_res == sinsp_appevtparser::RES_OK)
+		{
+			if(p->m_type_str[0] == '>')
+			{
+				m_fake_userevt->type = PPME_USER_E;
+
+				uint16_t *lens = (uint16_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr));
+				lens[0] = 8;
+				lens[1] = 8;
+				lens[2] = 8;
+
+				*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 6) = p->m_id;
+				*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 14) = (uint64_t)&p->m_tags;
+				*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 22) = (uint64_t)&p->m_args;
+			}
+			else
+			{
+				m_fake_userevt->type = PPME_USER_X;
+
+				uint16_t *lens = (uint16_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr));
+				lens[0] = 8;
+
+				*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 2) = p->m_id;
+			}
+		}
+		else
 		{
 			m_fake_userevt->type = PPME_USER_E;
 
@@ -2068,33 +2093,6 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 			*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 6) = 0;
 			*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 14) = (uint64_t)&p->m_tags;
 			*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 22) = (uint64_t)&p->m_args;
-			
-			return;
-		}
-
-		if(p->m_type_str[0] == '>')
-		{
-			m_fake_userevt->type = PPME_USER_E;
-
-			uint16_t *lens = (uint16_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr));
-			lens[0] = 8;
-			lens[1] = 8;
-			lens[2] = 8;
-
-//			*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 6) = p->m_id;
-			*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 6) = 123;
-			*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 14) = (uint64_t)&p->m_tags;
-			*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 22) = (uint64_t)&p->m_args;
-		}
-		else
-		{
-			m_fake_userevt->type = PPME_USER_X;
-
-			uint16_t *lens = (uint16_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr));
-			lens[0] = 8;
-
-//			*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 2) = p->m_id;
-			*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 2) = 123;
 		}
 
 		scap_evt* tevt = evt->m_pevt;
