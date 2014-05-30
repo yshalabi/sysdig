@@ -307,7 +307,7 @@ public:
 		//
 		// First tag
 		//
-		m_res = skip_spaces_and_commas_and_sq_brakets(p, &delta);
+		m_res = skip_spaces_and_char(p, &delta, '[');
 		if(m_res != sinsp_appevtparser::RES_OK)
 		{
 			return;
@@ -379,7 +379,7 @@ public:
 			m_argnamelens.push_back(delta - 2);
 			m_tot_argnamelens += delta - 2;
 
-			m_res = skip_spaces_and_columns(p, &delta);
+			m_res = skip_spaces_and_char(p, &delta, ':');
 			if(m_res != sinsp_appevtparser::RES_OK)
 			{
 				return;
@@ -424,7 +424,7 @@ public:
 				m_argnamelens.push_back(delta - 2);
 				m_tot_argnamelens += delta - 2;
 
-				m_res = skip_spaces_and_columns(p, &delta);
+				m_res = skip_spaces_and_char(p, &delta, ':');
 				if(m_res != sinsp_appevtparser::RES_OK)
 				{
 					return;
@@ -540,18 +540,18 @@ VISIBILITY_PRIVATE
 		return sinsp_appevtparser::RES_OK;
 	}
 
-	inline parse_result skip_spaces_and_columns(char* p, uint32_t* delta)
+	inline parse_result skip_spaces_and_char(char* p, uint32_t* delta, char char_to_skip)
 	{
 		char* start = p;
 		uint32_t nc = 0;
 
-		while(*p == ' ' || *p == ':' || *p == 0)
+		while(*p == ' ' || *p == char_to_skip || *p == 0)
 		{
 			if(*p == 0)
 			{
 				return sinsp_appevtparser::RES_TRUNCATED;
 			}
-			else if(*p == ':')
+			else if(*p == char_to_skip)
 			{
 				nc++;
 			}

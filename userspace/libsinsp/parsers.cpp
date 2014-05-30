@@ -64,7 +64,7 @@ sinsp_parser::sinsp_parser(sinsp *inspector) :
 
 
 
-char doc[] = "[\">t\", 12435, [\"mysql\", \"query\", \"init\"], [{\"argname1\":\"argval1\"}, {\"argname2\":\"argval2\"}, {\"argname3\":\"argval3\"}]]";
+char doc[] = "[\">\", 12435, [\"mysql\", \"query\", \"init\"], [{\"argname1\":\"argval1\"}, {\"argname2\":\"argval2\"}, {\"argname3\":\"argval3\"}]]";
 char doc1[] = "[\"<t\", 12435, [\"mysql\", \"query\", \"init\"], []]";
 sinsp_appevtparser p(inspector);
 printf("1\n");
