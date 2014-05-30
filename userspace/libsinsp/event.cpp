@@ -872,7 +872,6 @@ Json::Value sinsp_evt::get_param_as_json(uint32_t id, OUT const char** resolved_
 			{
 				Json::Value source;
 				Json::Value dest;
-
 				char ipv4_addr[SEVT_IPV4_LEN];
 
 				snprintf(
@@ -924,7 +923,6 @@ Json::Value sinsp_evt::get_param_as_json(uint32_t id, OUT const char** resolved_
 				{
 					Json::Value source;
 					Json::Value dest;
-
 					char ipv4_addr[SEVT_IPV4_LEN];
 
 					snprintf(

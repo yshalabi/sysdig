@@ -329,7 +329,9 @@ void sinsp_parser::process_event(sinsp_evt *evt)
 		parse_context_switch(evt);
 		break;
 	case PPME_SYSCALL_BRK_4_X:
-		parse_brk_exit(evt);
+	case PPME_SYSCALL_MMAP_X:
+	case PPME_SYSCALL_MUNMAP_X:
+		parse_brk_munmap_mmap_exit(evt);
 	default:
 		break;
 	}
@@ -2799,7 +2801,7 @@ void sinsp_parser::parse_context_switch(sinsp_evt* evt)
 	}
 }
 
-void sinsp_parser::parse_brk_exit(sinsp_evt* evt)
+void sinsp_parser::parse_brk_munmap_mmap_exit(sinsp_evt* evt)
 {
 	ASSERT(evt->m_tinfo);
 	if(evt->m_tinfo)
