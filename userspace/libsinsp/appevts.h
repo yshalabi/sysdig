@@ -187,6 +187,12 @@ public:
 		m_fullfragment_storage_str.clear();
 
 		//
+		// Parser tests stop here
+		//
+#ifdef DR_TEST_APPEVT_PARSER
+		return sinsp_appevtparser::RES_OK;
+#endif		
+		//
 		// If this is an enter event, allocate a sinsp_partial_appevt object and
 		// push it to the list
 		//
