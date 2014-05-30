@@ -190,7 +190,7 @@ public:
 		// If this is an enter event, allocate a sinsp_partial_appevt object and
 		// push it to the list
 		//
-		if(m_is_enter)
+		if(m_type_str[0] == '>')
 		{
 			sinsp_partial_appevt* pae = m_inspector->m_partial_appevts_pool->pop();
 			if(pae == NULL)
@@ -263,9 +263,19 @@ public:
 		}
 
 		//
+		// type
+		//
+		m_res = parsestr(p, &m_type_str, &delta);
+		if(m_res != sinsp_appevtparser::RES_OK)
+		{
+			return;
+		}
+		p += delta;
+
+		//
 		// ID
 		//
-		m_res = skip_spaces(p, &delta);
+		m_res = skip_spaces_and_commas(p, &delta, 1);
 		if(m_res != sinsp_appevtparser::RES_OK)
 		{
 			return;
@@ -293,32 +303,6 @@ public:
 			return;
 		}
 		p += delta;
-
-		//
-		// Direction
-		//
-		if(*p == '>')
-		{
-			m_is_enter = true;
-		}
-		else if(*p == '<')
-		{
-			m_is_enter = false;
-		}
-		else
-		{
-			if(*p == 0)
-			{
-				m_res = sinsp_appevtparser::RES_TRUNCATED;
-				return;
-			}
-			else
-			{
-				m_res = sinsp_appevtparser::RES_FAILED;
-				return;
-			}
-		}
-		p++;
 
 		//
 		// First tag
@@ -486,7 +470,8 @@ public:
 		return;
 	}
 
-	bool m_is_enter;
+//	bool m_is_enter;
+	char* m_type_str;
 	uint64_t m_id;
 	vector<char*> m_tags;
 	vector<char*> m_argnames;

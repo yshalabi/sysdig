@@ -64,8 +64,8 @@ sinsp_parser::sinsp_parser(sinsp *inspector) :
 
 
 
-char doc[] = "[12435, >, [\"mysql\", \"query\", \"init\"], [{\"argname1\":\"argval1\"}, {\"argname2\":\"argval2\"}, {\"argname3\":\"argval3\"}]]";
-char doc1[] = "[12435, <, [\"mysql\", \"query\", \"init\"], []]";
+char doc[] = "[\">t\", 12435, [\"mysql\", \"query\", \"init\"], [{\"argname1\":\"argval1\"}, {\"argname2\":\"argval2\"}, {\"argname3\":\"argval3\"}]]";
+char doc1[] = "[\"<t\", 12435, [\"mysql\", \"query\", \"init\"], []]";
 sinsp_appevtparser p(inspector);
 printf("1\n");
 
@@ -2047,7 +2047,7 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 		m_fake_userevt->ts = evt->m_pevt->ts;
 		m_fake_userevt->tid = evt->m_pevt->tid;
 
-		if(p->m_is_enter)
+		if(p->m_type_str[0] == '>')
 		{
 			m_fake_userevt->type = PPME_USER_E;
 
