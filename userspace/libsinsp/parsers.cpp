@@ -2030,6 +2030,11 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 		uint32_t datalen = parinfo->m_len;
 		sinsp_appevtparser* p = tinfo->m_userevt_parser;
 
+		if(p == NULL)
+		{
+			p = tinfo->m_userevt_parser = new sinsp_appevtparser(m_inspector);
+		}
+
 		p->process_event_data(data, datalen, evt->get_ts());
 		if(p->m_res != sinsp_appevtparser::RES_OK)
 		{

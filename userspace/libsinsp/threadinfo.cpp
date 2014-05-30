@@ -40,6 +40,7 @@ sinsp_threadinfo::sinsp_threadinfo() :
 	m_fdtable(NULL)
 {
 	m_inspector = NULL;
+	m_userevt_parser = NULL;
 	init();
 }
 
@@ -47,6 +48,7 @@ sinsp_threadinfo::sinsp_threadinfo(sinsp *inspector) :
 	m_fdtable(inspector)
 {
 	m_inspector = inspector;
+	m_userevt_parser = NULL;
 	init();
 }
 
@@ -77,7 +79,6 @@ void sinsp_threadinfo::init()
 	m_latency = 0;
 #endif
 	m_ainfo = NULL;
-	m_userevt_parser = new sinsp_appevtparser(m_inspector);
 }
 
 sinsp_threadinfo::~sinsp_threadinfo()
