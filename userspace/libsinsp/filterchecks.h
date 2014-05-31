@@ -441,6 +441,8 @@ public:
 //
 // Application events
 //
+#define TEXT_ARG_ID -1000000
+
 class sinsp_filter_check_appevt : public sinsp_filter_check
 {
 public:
@@ -464,8 +466,10 @@ private:
 
 	int32_t m_argid;
 	string m_argname;
+	const char* m_cargname;
 	char* m_storage;
 	uint32_t m_storage_size;
+	int64_t m_u64_storage;
 };
 
 //

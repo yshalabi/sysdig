@@ -2074,8 +2074,10 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 
 				uint16_t *lens = (uint16_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr));
 				lens[0] = 8;
+				lens[0] = 8;
 
-				*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 2) = p->m_id;
+				*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 4) = p->m_id;
+				*(uint64_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr) + 12) = (uint64_t)&p->m_tags;
 			}
 		}
 		else

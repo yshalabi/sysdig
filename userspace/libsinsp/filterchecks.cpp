@@ -2143,9 +2143,9 @@ const filtercheck_field_info sinsp_filter_check_appevt_fields[] =
 {
 	{PT_UINT64, EPF_NONE, PF_DEC, "appevt.id", "event ID."},
 	{PT_CHARBUF, EPF_NONE, PF_NA, "appevt.tags", "comma-separated list of event tags."},
-	{PT_CHARBUF, EPF_NONE, PF_NA, "appevt.tag", "one of the app event tags specified by number. E.g. 'appevt.tag[1]'."},
+	{PT_CHARBUF, EPF_NONE, PF_NA, "appevt.tag", "one of the app event tags specified by offset. E.g. 'appevt.tag[1]'. You can use a negative offset to pick elements from the end of the tag list. For example, 'appevt.tag[-1]' returns the last tag."},
 	{PT_CHARBUF, EPF_NONE, PF_NA, "appevt.args", "comma-separated list of event arguments."},
-	{PT_CHARBUF, EPF_NONE, PF_NA, "appevt.arg", "one of the app event arguments specified by number or by name. E.g. 'appevt.tag.mytag' or 'appevt.tag[1]'."},
+	{PT_CHARBUF, EPF_NONE, PF_NA, "appevt.arg", "one of the app event arguments specified by name or by offset. E.g. 'appevt.tag.mytag' or 'appevt.tag[1]'. You can use a negative offset to pick elements from the end of the tag list. For example, 'appevt.arg[-1]' returns the last argument."},
 	{PT_RELTIME, EPF_NONE, PF_DEC, "appevt.latency", "delta between an exit event and the correspondent enter event."},
 };
 
@@ -2161,6 +2161,8 @@ sinsp_filter_check_appevt::sinsp_filter_check_appevt()
 	{
 		throw sinsp_exception("memory allocation error in sinsp_filter_check_appevt::sinsp_filter_check_appevt");
 	}
+
+	m_cargname = NULL;
 }
 
 sinsp_filter_check* sinsp_filter_check_appevt::allocate_new()
@@ -2195,8 +2197,9 @@ int32_t sinsp_filter_check_appevt::extract_arg(string fldname, string val, OUT c
 		}
 
 		m_argname = val.substr(fldname.size() + 1);
+		m_cargname = m_argname.c_str();
 		parsed_len = fldname.size() + m_argname.size() + 1;
-		m_argid = -1;
+		m_argid = TEXT_ARG_ID;
 	}
 	else
 	{
@@ -2299,13 +2302,13 @@ uint8_t* sinsp_filter_check_appevt::extract(sinsp_evt *evt, OUT uint32_t* len)
 		}
 	case TYPE_TAG:
 		{
-			m_storage = NULL;
+			char* res = NULL;
 
 			if(m_argid >= 0)
 			{
 				if(m_argid < (int32_t)aep->m_tags.size())
 				{
-					m_storage = aep->m_tags[m_argid];
+					res = aep->m_tags[m_argid];
 				}
 			}
 			else
@@ -2314,17 +2317,16 @@ uint8_t* sinsp_filter_check_appevt::extract(sinsp_evt *evt, OUT uint32_t* len)
 
 				if(id >= 0)
 				{
-					m_storage = aep->m_tags[id];
+					res = aep->m_tags[id];
 				}
 			}
 
-			return (uint8_t*)m_storage;
+			return (uint8_t*)res;
 		}
 	case TYPE_ARGS:
 		{
 			sinsp_partial_appevt* pae;
-
-			if(etype != PPME_USER_E)
+			if(etype == PPME_USER_E)
 			{
 				pae = aep->m_enter_pae;
 			}
@@ -2333,25 +2335,37 @@ uint8_t* sinsp_filter_check_appevt::extract(sinsp_evt *evt, OUT uint32_t* len)
 				pae = &aep->m_exit_pae;
 			}
 
-			vector<char*>::iterator it;
-			vector<uint32_t>::iterator sit;
+			vector<char*>::iterator nameit;
+			vector<char*>::iterator valit;
+			vector<uint32_t>::iterator namesit;
+			vector<uint32_t>::iterator valsit;
 
-			uint32_t ntags = aep->m_tags.size();
-			uint32_t encoded_tags_len = aep->m_tot_taglens + ntags + 1;
+			uint32_t nargs = pae->m_argnames.size();
+			uint32_t encoded_args_len = pae->m_argnames_len + pae->m_argvals_len +
+				nargs + nargs + 2;
 
-			if(m_storage_size < encoded_tags_len)
+			if(m_storage_size < encoded_args_len)
 			{
-				m_storage = (char*)realloc(m_storage, encoded_tags_len);
-				m_storage_size = encoded_tags_len;
+				m_storage = (char*)realloc(m_storage, encoded_args_len);
+				m_storage_size = encoded_args_len;
 			}
 
 			char* p = m_storage;
 
-			for(it = aep->m_tags.begin(), sit = aep->m_taglens.begin(); 
-				it != aep->m_tags.end(); ++it, ++sit)
+			ASSERT(false);
+			return NULL;
+/*
+			for(nameit = pae->m_argnames.begin(), valit = pae->m_argvals.begin(), 
+				namesit = pae->m_argnamelens.begin(), valsit = pae->m_argvallens.begin(); 
+				nameit != pae->m_argnames.end(); 
+				++nameit, ++namesit, ++valit, ++valsit)
 			{
-				memcpy(p, *it, (*sit));
-				p += (*sit);
+				memcpy(p, *nameit, (*namesit));
+				p += (*namesit);
+				*p++ = ':';
+
+				memcpy(p, *valit, (*valsit));
+				p += (*valsit);
 				*p++ = ',';
 			}
 
@@ -2365,7 +2379,70 @@ uint8_t* sinsp_filter_check_appevt::extract(sinsp_evt *evt, OUT uint32_t* len)
 			}
 
 			return (uint8_t*)m_storage;
+*/
 		}
+	case TYPE_ARG:
+		{
+			char* res = NULL;
+			sinsp_partial_appevt* pae = aep->m_enter_pae;
+			ASSERT(pae);
+
+			if(m_argid == TEXT_ARG_ID)
+			{
+				//
+				// Argument expressed as name, e.g. appevt.arg.name.
+				// Scan the argname list and find the match.
+				//
+				uint32_t j;
+
+				for(j = 0; j < pae->m_nargs; j++)
+				{
+					if(strcmp(m_cargname, pae->m_argnames[j]) == 0)
+					{
+						res = pae->m_argvals[j];
+					}
+				}
+			}
+			else
+			{
+				//
+				// Argument expressed as id, e.g. appevt.arg[1].
+				// Pick the corresponding value.
+				//
+				if(m_argid >= 0)
+				{
+					if(m_argid < (int32_t)pae->m_nargs)
+					{
+						res = pae->m_argvals[m_argid];
+					}
+				}
+				else
+				{
+					int32_t id = (int32_t)pae->m_nargs + m_argid;
+
+					if(id >= 0)
+					{
+						res = pae->m_argvals[id];
+					}
+				}
+			}
+
+			return (uint8_t*)res;
+		}
+	case TYPE_LATENCY:
+		{
+			if(etype == PPME_USER_X)
+			{
+				ASSERT(aep->m_enter_pae);
+				m_u64_storage = aep->m_exit_pae.m_time - aep->m_enter_pae->m_time;
+				return (uint8_t*)&m_u64_storage;
+			}
+			else
+			{
+				return NULL;
+			}
+		}
+		break;
 	default:
 		ASSERT(false);
 		break;

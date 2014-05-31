@@ -233,7 +233,7 @@ public:
 			{
 				if(m_exit_pae.compare(*it) == true)
 				{
-					m_exit_pae.m_time = ts - (*it)->m_time;
+					m_exit_pae.m_time = ts;
 
 					//
 					// This is a bit tricky and deserves some explanation:
@@ -896,8 +896,8 @@ VISIBILITY_PRIVATE
 		//
 		// Pack the argnames
 		//
-		uint32_t nargnames = m_argnames.size();
-		uint32_t encoded_argnames_len = m_tot_argnamelens + nargnames + 1;
+		pae->m_nargs = m_argnames.size();
+		uint32_t encoded_argnames_len = m_tot_argnamelens + pae->m_nargs + 1;
 
 		if(pae->m_argnames_storage_size < encoded_argnames_len)
 		{
@@ -920,8 +920,7 @@ VISIBILITY_PRIVATE
 		//
 		// Pack the argvals
 		//
-		uint32_t nargvals = m_argvals.size();
-		uint32_t encoded_argvals_len = m_tot_argvallens + nargvals + 1;
+		uint32_t encoded_argvals_len = m_tot_argvallens + pae->m_nargs + 1;
 
 		if(pae->m_argvals_storage_size < encoded_argvals_len)
 		{
