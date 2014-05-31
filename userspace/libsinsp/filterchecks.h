@@ -450,6 +450,7 @@ public:
 		TYPE_TAGS,
 		TYPE_TAG,
 		TYPE_ARGS,
+		TYPE_ARG,
 		TYPE_LATENCY,
 	};
 

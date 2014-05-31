@@ -27,9 +27,11 @@ public:
 	sinsp_partial_appevt()
 	{
 		m_tags_storage = (char*)malloc(UESTORAGE_INITIAL_BUFSIZE);
-		m_args_storage = (char*)malloc(UESTORAGE_INITIAL_BUFSIZE);
+		m_argnames_storage = (char*)malloc(UESTORAGE_INITIAL_BUFSIZE);
+		m_argvals_storage = (char*)malloc(UESTORAGE_INITIAL_BUFSIZE);
 		m_tags_storage_size = UESTORAGE_INITIAL_BUFSIZE;
-		m_args_storage_size = UESTORAGE_INITIAL_BUFSIZE;
+		m_argnames_storage_size = UESTORAGE_INITIAL_BUFSIZE;
+		m_argvals_storage_size = UESTORAGE_INITIAL_BUFSIZE;
 	}
 
 	~sinsp_partial_appevt()
@@ -39,9 +41,14 @@ public:
 			free(m_tags_storage);
 		}
 
-		if(m_args_storage)
+		if(m_argnames_storage)
 		{
-			free(m_args_storage); 
+			free(m_argnames_storage); 
+		}
+
+		if(m_argvals_storage)
+		{
+			free(m_argvals_storage); 
 		}
 	}
 
@@ -63,13 +70,18 @@ public:
 	}
 
 	char* m_tags_storage;
-	char* m_args_storage;
+	char* m_argnames_storage;
+	char* m_argvals_storage;
 	uint32_t m_tags_len;
-	uint32_t m_args_len;
+	uint32_t m_argnames_len;
+	uint32_t m_argvals_len;
 	uint32_t m_tags_storage_size;
-	uint32_t m_args_storage_size;
-	uint64_t m_id; 
-	vector<char*> m_tags;
+	uint32_t m_argnames_storage_size;
+	uint32_t m_argvals_storage_size;
+	uint64_t m_id;
+	vector<char*> m_argnames;
+	vector<char*> m_argvals;
+	uint32_t m_nargs;
 
 	uint64_t m_time;
 };
@@ -95,6 +107,7 @@ public:
 		m_storage = NULL;
 		m_res = sinsp_appevtparser::RES_OK;
 		m_fragment_size = 0;
+		m_enter_pae = NULL;
 	}
 
 	~sinsp_appevtparser()
@@ -207,6 +220,7 @@ public:
 			init_partial_appevt(pae);
 			pae->m_time = ts;
 			m_inspector->m_partial_appevts_list.push_front(pae);
+			m_enter_pae = pae;
 		}
 		else
 		{
@@ -220,12 +234,25 @@ public:
 				if(m_exit_pae.compare(*it) == true)
 				{
 					m_exit_pae.m_time = ts - (*it)->m_time;
+
+					//
+					// This is a bit tricky and deserves some explanation:
+					// despite removing the pae and retunring it to the available pool,
+					// we link to it so that the filters will use it. We do that as an
+					// optimization (it avoids making a copy or implementing logic for 
+					// delayed list removal), and we base it on the assumption that,
+					// since the processing is strictly sequential and single thread,
+					// nobody will modify the event until the event is fully processed.
+					//
+					m_enter_pae = *it;
+
 					m_inspector->m_partial_appevts_pool->push(*it);
 					partial_appevts_list->erase(it);
 					return sinsp_appevtparser::RES_OK;
 				}
 			}
 
+			m_enter_pae = NULL;
 			ASSERT(false);
 		}
 
@@ -476,7 +503,6 @@ public:
 		return;
 	}
 
-//	bool m_is_enter;
 	char* m_type_str;
 	uint64_t m_id;
 	vector<char*> m_tags;
@@ -489,6 +515,8 @@ public:
 	uint32_t m_tot_taglens;
 	uint32_t m_tot_argnamelens;
 	uint32_t m_tot_argvallens;
+	sinsp_partial_appevt* m_enter_pae;
+	sinsp_partial_appevt m_exit_pae;
 
 VISIBILITY_PRIVATE
 	inline parse_result skip_spaces(char* p, uint32_t* delta)
@@ -838,8 +866,12 @@ VISIBILITY_PRIVATE
 		//
 		pae->m_id = m_id;
 
+		ASSERT(m_tags.size() == m_taglens.size());
+		ASSERT(m_argnames.size() == m_argnamelens.size());
+		ASSERT(m_argvals.size() == m_argvallens.size());
+
 		//
-		// Copy the tags
+		// Pack the tags
 		//
 		uint32_t ntags = m_tags.size();
 		uint32_t encoded_tags_len = m_tot_taglens + ntags + 1;
@@ -849,10 +881,6 @@ VISIBILITY_PRIVATE
 			pae->m_tags_storage = (char*)realloc(pae->m_tags_storage, encoded_tags_len);
 			pae->m_tags_storage_size = encoded_tags_len;
 		}
-
-		ASSERT(m_tags.size() == m_taglens.size());
-		ASSERT(m_argnames.size() == m_argnamelens.size());
-		ASSERT(m_argvals.size() == m_argvallens.size());
 		
 		char* p = pae->m_tags_storage;
 		for(it = m_tags.begin(), sit = m_taglens.begin(); 
@@ -864,6 +892,54 @@ VISIBILITY_PRIVATE
 
 		*p++ = 0;
 		pae->m_tags_len = p - pae->m_tags_storage;
+
+		//
+		// Pack the argnames
+		//
+		uint32_t nargnames = m_argnames.size();
+		uint32_t encoded_argnames_len = m_tot_argnamelens + nargnames + 1;
+
+		if(pae->m_argnames_storage_size < encoded_argnames_len)
+		{
+			pae->m_argnames_storage = (char*)realloc(pae->m_argnames_storage, encoded_argnames_len);
+			pae->m_argnames_storage_size = encoded_argnames_len;
+		}
+		
+		p = pae->m_argnames_storage;
+		for(it = m_argnames.begin(), sit = m_argnamelens.begin(); 
+			it != m_argnames.end(); ++it, ++sit)
+		{
+			memcpy(p, *it, (*sit) + 1);
+			pae->m_argnames.push_back(p);
+			p += (*sit) + 1;
+		}
+
+		*p++ = 0;
+		pae->m_argnames_len = p - pae->m_argnames_storage;
+
+		//
+		// Pack the argvals
+		//
+		uint32_t nargvals = m_argvals.size();
+		uint32_t encoded_argvals_len = m_tot_argvallens + nargvals + 1;
+
+		if(pae->m_argvals_storage_size < encoded_argvals_len)
+		{
+			pae->m_argvals_storage = (char*)realloc(pae->m_argvals_storage, encoded_argvals_len);
+			pae->m_argvals_storage_size = encoded_argvals_len;
+		}
+		
+		p = pae->m_argvals_storage;
+		for(it = m_argvals.begin(), sit = m_argvallens.begin(); 
+			it != m_argvals.end(); ++it, ++sit)
+		{
+			memcpy(p, *it, (*sit) + 1);
+			pae->m_argvals.push_back(p);
+			p += (*sit) + 1;
+		}
+
+		*p++ = 0;
+		pae->m_argvals_len = p - pae->m_argvals_storage;
 	}
 
 	sinsp *m_inspector;
@@ -872,7 +948,6 @@ VISIBILITY_PRIVATE
 	uint32_t m_fragment_size;
 	sinsp_appevtparser::parse_result m_res;
 	string m_fullfragment_storage_str;
-	sinsp_partial_appevt m_exit_pae;
 
 	friend class sinsp_parser;
 };

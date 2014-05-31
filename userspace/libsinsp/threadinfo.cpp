@@ -40,7 +40,7 @@ sinsp_threadinfo::sinsp_threadinfo() :
 	m_fdtable(NULL)
 {
 	m_inspector = NULL;
-	m_userevt_parser = NULL;
+	m_appevt_parser = NULL;
 	init();
 }
 
@@ -48,7 +48,7 @@ sinsp_threadinfo::sinsp_threadinfo(sinsp *inspector) :
 	m_fdtable(inspector)
 {
 	m_inspector = inspector;
-	m_userevt_parser = NULL;
+	m_appevt_parser = NULL;
 	init();
 }
 
@@ -99,9 +99,9 @@ sinsp_threadinfo::~sinsp_threadinfo()
 
 	m_private_state.clear();
 
-	if(m_userevt_parser)
+	if(m_appevt_parser)
 	{
-		delete m_userevt_parser;
+		delete m_appevt_parser;
 	}
 }
 

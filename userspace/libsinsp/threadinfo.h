@@ -159,7 +159,7 @@ public:
 	//
 	// Parser for the user events. Public so that filter fields can access it
 	//
-	sinsp_appevtparser* m_userevt_parser;
+	sinsp_appevtparser* m_appevt_parser;
 
 	thread_analyzer_info* m_ainfo;
 

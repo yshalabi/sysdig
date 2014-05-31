@@ -2029,11 +2029,11 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 		sinsp_evt_param *parinfo = evt->get_param(1);
 		char* data = parinfo->m_val;
 		uint32_t datalen = parinfo->m_len;
-		sinsp_appevtparser* p = tinfo->m_userevt_parser;
+		sinsp_appevtparser* p = tinfo->m_appevt_parser;
 
 		if(p == NULL)
 		{
-			p = tinfo->m_userevt_parser = new sinsp_appevtparser(m_inspector);
+			p = tinfo->m_appevt_parser = new sinsp_appevtparser(m_inspector);
 		}
 
 		p->process_event_data(data, datalen, evt->get_ts());
