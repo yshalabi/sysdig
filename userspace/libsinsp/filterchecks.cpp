@@ -2142,6 +2142,8 @@ uint8_t* sinsp_filter_check_group::extract(sinsp_evt *evt, OUT uint32_t* len)
 const filtercheck_field_info sinsp_filter_check_appevt_fields[] =
 {
 	{PT_UINT64, EPF_NONE, PF_DEC, "appevt.id", "event ID."},
+	{PT_UINT32, EPF_NONE, PF_DEC, "appevt.ntags", "Number of tags that this user event has."},
+	{PT_UINT32, EPF_NONE, PF_DEC, "appevt.nargs", "Number of arguments that this user event has."},
 	{PT_CHARBUF, EPF_NONE, PF_NA, "appevt.tags", "comma-separated list of event tags."},
 	{PT_CHARBUF, EPF_NONE, PF_NA, "appevt.tag", "one of the app event tags specified by offset. E.g. 'appevt.tag[1]'. You can use a negative offset to pick elements from the end of the tag list. For example, 'appevt.tag[-1]' returns the last tag."},
 	{PT_CHARBUF, EPF_NONE, PF_NA, "appevt.args", "comma-separated list of event arguments."},
@@ -2265,6 +2267,17 @@ uint8_t* sinsp_filter_check_appevt::extract(sinsp_evt *evt, OUT uint32_t* len)
 	{
 	case TYPE_ID:
 		return (uint8_t*)&eparser->m_id;
+	case TYPE_NTAGS:
+		m_u32_storage = eparser->m_tags.size();
+		return (uint8_t*)&m_u32_storage;
+	case TYPE_NARGS:
+		{
+			sinsp_partial_appevt* pae = eparser->m_enter_pae;
+			ASSERT(pae);
+
+			m_u32_storage = pae->m_argvals.size();
+			return (uint8_t*)&m_u32_storage;
+		}
 	case TYPE_TAGS:
 		{
 			vector<char*>::iterator it;

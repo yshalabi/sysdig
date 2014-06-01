@@ -449,6 +449,8 @@ public:
 	enum check_type
 	{
 		TYPE_ID = 0,
+		TYPE_NTAGS,
+		TYPE_NARGS,
 		TYPE_TAGS,
 		TYPE_TAG,
 		TYPE_ARGS,
@@ -470,6 +472,7 @@ private:
 	char* m_storage;
 	uint32_t m_storage_size;
 	int64_t m_u64_storage;
+	int32_t m_u32_storage;
 };
 
 //
