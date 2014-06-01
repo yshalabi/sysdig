@@ -2082,6 +2082,9 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 		}
 		else
 		{
+			//
+			// We don't know the direction, so we use enter.
+			//
 			m_fake_userevt->type = PPME_USER_E;
 
 			uint16_t *lens = (uint16_t *)(fakeevt_storage + sizeof(struct ppm_evt_hdr));

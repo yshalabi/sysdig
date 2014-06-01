@@ -362,6 +362,13 @@ public:
 		TYPE_IODIR = 26,
 		TYPE_ISWAIT = 27,
 		TYPE_COUNT = 28,
+		TYPE_APPEVT_ID = 29,
+		TYPE_APPEVT_NTAGS = 30,
+		TYPE_APPEVT_NARGS = 31,
+		TYPE_APPEVT_TAGS = 32,
+		TYPE_APPEVT_TAG = 33,
+		TYPE_APPEVT_ARGS = 34,
+		TYPE_APPEVT_ARG = 35,
 	};
 
 	sinsp_filter_check_event();
@@ -389,11 +396,16 @@ public:
 	filtercheck_field_info m_customfield;
 
 private:
-	int32_t extract_arg(string fldname, string val, OUT const struct ppm_param_info** parinfo);
-	int32_t gmt2local(time_t t);
+	inline int32_t extract_arg(string fldname, string val, OUT const struct ppm_param_info** parinfo);
+	int32_t extract_appevt_arg(string fldname, string val, OUT const struct ppm_param_info** parinfo);
+	inline int32_t gmt2local(time_t t);
 	void ts_to_string(uint64_t ts, OUT string* res, bool full, bool ns);
+	inline bool compare_appevt(sinsp_evt *evt, sinsp_partial_appevt* pae);
 
 	bool m_is_compare;
+	char* m_storage;
+	uint32_t m_storage_size;
+	const char* m_cargname;
 };
 
 //
@@ -471,8 +483,8 @@ private:
 	const char* m_cargname;
 	char* m_storage;
 	uint32_t m_storage_size;
-	int64_t m_u64_storage;
-	int32_t m_u32_storage;
+	int64_t m_u64val;
+	int32_t m_u32val;
 };
 
 //

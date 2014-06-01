@@ -165,7 +165,6 @@ public:
 			// Valid syntax, but the message is incomplete. Buffer it and wait for
 			// more fragments.
 			//
-
 			if(m_fragment_size > MAX_USER_EVT_BUFFER)
 			{
 				//

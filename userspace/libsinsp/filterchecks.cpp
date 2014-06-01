@@ -1197,6 +1197,14 @@ const filtercheck_field_info sinsp_filter_check_event_fields[] =
 	{PT_CHARBUF, EPF_NONE, PF_NA, "evt.io_dir", "'r' for events that read from FDs, like read(); 'w' for events that write to FDs, like write()."},
 	{PT_BOOL, EPF_NONE, PF_NA, "evt.is_wait", "'true' for events that make the thread wait, e.g. sleep(), select(), poll()."},
 	{PT_UINT32, EPF_NONE, PF_DEC, "evt.count", "This filter field always returns 1 and can be used to count events from inside chisels."},
+	// App events related fields. These can be used only as filter fields, not as display fields
+	{PT_UINT64, EPF_FILTER_ONLY, PF_DEC, "evt.appevt.id", "event ID."},
+	{PT_UINT32, EPF_FILTER_ONLY, PF_DEC, "evt.appevt.ntags", "Number of tags that this user event has."},
+	{PT_UINT32, EPF_FILTER_ONLY, PF_DEC, "evt.appevt.nargs", "Number of arguments that this user event has."},
+	{PT_CHARBUF, EPF_FILTER_ONLY, PF_NA, "evt.appevt.tags", "comma-separated list of event tags."},
+	{PT_CHARBUF, EPF_FILTER_ONLY, PF_NA, "evt.appevt.tag", "one of the app event tags specified by offset. E.g. 'appevt.tag[1]'. You can use a negative offset to pick elements from the end of the tag list. For example, 'appevt.tag[-1]' returns the last tag."},
+	{PT_CHARBUF, EPF_FILTER_ONLY, PF_NA, "evt.appevt.args", "comma-separated list of event arguments."},
+	{PT_CHARBUF, EPF_FILTER_ONLY, PF_NA, "evt.appevt.arg", "one of the app event arguments specified by name or by offset. E.g. 'appevt.tag.mytag' or 'appevt.tag[1]'. You can use a negative offset to pick elements from the end of the tag list. For example, 'appevt.arg[-1]' returns the last argument."},
 };
 
 sinsp_filter_check_event::sinsp_filter_check_event()
@@ -1206,6 +1214,15 @@ sinsp_filter_check_event::sinsp_filter_check_event()
 	m_info.m_name = "evt";
 	m_info.m_fields = sinsp_filter_check_event_fields;
 	m_info.m_nfiedls = sizeof(sinsp_filter_check_event_fields) / sizeof(sinsp_filter_check_event_fields[0]);
+
+	m_storage_size = UESTORAGE_INITIAL_BUFSIZE;
+	m_storage = (char*)malloc(m_storage_size);
+	if(m_storage == NULL)
+	{
+		throw sinsp_exception("memory allocation error in sinsp_filter_check_appevt::sinsp_filter_check_appevt");
+	}
+
+	m_cargname = NULL;
 }
 
 sinsp_filter_check* sinsp_filter_check_event::allocate_new()
@@ -1213,7 +1230,7 @@ sinsp_filter_check* sinsp_filter_check_event::allocate_new()
 	return (sinsp_filter_check*) new sinsp_filter_check_event();
 }
 
-int32_t sinsp_filter_check_event::extract_arg(string fldname, string val, OUT const struct ppm_param_info** parinfo)
+inline int32_t sinsp_filter_check_event::extract_arg(string fldname, string val, OUT const struct ppm_param_info** parinfo)
 {
 	uint32_t parsed_len = 0;
 
@@ -1259,6 +1276,45 @@ int32_t sinsp_filter_check_event::extract_arg(string fldname, string val, OUT co
 	return parsed_len; 
 }
 
+int32_t sinsp_filter_check_event::extract_appevt_arg(string fldname, string val, OUT const struct ppm_param_info** parinfo)
+{
+	uint32_t parsed_len = 0;
+
+	//
+	// 'arg' and 'resarg' are handled in a custom way
+	//
+	if(val[fldname.size()] == '[')
+	{
+		if(parinfo != NULL)
+		{
+			throw sinsp_exception("appevt field must be expressed explicitly");
+		}
+
+		parsed_len = val.find(']');
+		string numstr = val.substr(fldname.size() + 1, parsed_len - fldname.size() - 1);
+		m_argid = sinsp_numparser::parsed32(numstr);
+		parsed_len++;
+	}
+	else if(val[fldname.size()] == '.')
+	{
+		if(fldname == "evt.appevt.tag")
+		{
+			throw sinsp_exception("invalid syntax for evt.appevt.tag");
+		}
+
+		m_argname = val.substr(fldname.size() + 1);
+		m_cargname = m_argname.c_str();
+		parsed_len = fldname.size() + m_argname.size() + 1;
+		m_argid = TEXT_ARG_ID;
+	}
+	else
+	{
+		throw sinsp_exception("filter syntax error: " + val);
+	}
+
+	return parsed_len; 
+}
+
 int32_t sinsp_filter_check_event::parse_field_name(const char* str)
 {
 	string val(str);
@@ -1294,6 +1350,22 @@ int32_t sinsp_filter_check_event::parse_field_name(const char* str)
 		//
 		m_th_state_id = m_inspector->reserve_thread_memory(sizeof(uint16_t));
 		return sinsp_filter_check::parse_field_name(str);
+	}
+	else if(string(val, 0, sizeof("evt.appevt.tag") - 1) == "evt.appevt.tag" &&
+		string(val, 0, sizeof("evt.appevt.tags") - 1) != "evt.appevt.tags")
+	{
+		m_field_id = TYPE_APPEVT_TAG;
+		m_field = &m_info.m_fields[m_field_id];
+
+		return extract_appevt_arg("evt.appevt.tag", val, NULL);
+	}
+	else if(string(val, 0, sizeof("evt.appevt.arg") - 1) == "evt.appevt.arg" &&
+		string(val, 0, sizeof("evt.appevt.args") - 1) != "evt.appevt.args")
+	{
+		m_field_id = TYPE_APPEVT_ARG;
+		m_field = &m_info.m_fields[m_field_id];
+
+		return extract_appevt_arg("evt.appevt.arg", val, NULL);
 	}
 	else
 	{
@@ -1347,7 +1419,7 @@ const filtercheck_field_info* sinsp_filter_check_event::get_field_info()
 	}
 }
 
-int32_t sinsp_filter_check_event::gmt2local(time_t t)
+inline int32_t sinsp_filter_check_event::gmt2local(time_t t)
 {
 	int dt, dir;
 	struct tm *gmt, *loc;
@@ -1508,6 +1580,11 @@ Json::Value sinsp_filter_check_event::extract_as_js(sinsp_evt *evt, OUT uint32_t
 
 uint8_t* sinsp_filter_check_event::extract(sinsp_evt *evt, OUT uint32_t* len)
 {
+	if(m_field_id >= TYPE_APPEVT_ID && m_field_id <= TYPE_APPEVT_ARG)
+	{
+		int a = 0;
+	}
+
 	switch(m_field_id)
 	{
 	case TYPE_TIME:
@@ -1962,11 +2039,233 @@ Json::Value sinsp_filter_check_event::tojson(sinsp_evt* evt)
 	}
 }
 
+inline bool sinsp_filter_check_event::compare_appevt(sinsp_evt *evt, sinsp_partial_appevt* pae)
+{
+	ASSERT(pae);
+
+	switch(m_field_id)
+	{
+	case TYPE_APPEVT_ID:
+		if(flt_compare(m_cmpop, PT_UINT64, 
+			&pae->m_id,
+			&m_val_storage[0]) == true)
+		{
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	case TYPE_APPEVT_NTAGS:
+		//
+		// Not yet implemented
+		//
+
+		//m_u32val = eparser->m_tags.size();
+		//return (uint8_t*)&m_u32val;
+		ASSERT(false);
+		return false;
+	case TYPE_APPEVT_NARGS:
+		m_u32val = pae->m_argvals.size();
+
+		if(flt_compare(m_cmpop, PT_UINT32, 
+			&m_u32val,
+			&m_val_storage[0]) == true)
+		{
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+/*
+	case TYPE_APPEVT_TAGS:
+		{
+			vector<char*>::iterator it;
+			vector<uint32_t>::iterator sit;
+
+			uint32_t ntags = eparser->m_tags.size();
+			uint32_t encoded_tags_len = eparser->m_tot_taglens + ntags + 1;
+
+			if(m_storage_size < encoded_tags_len)
+			{
+				m_storage = (char*)realloc(m_storage, encoded_tags_len);
+				m_storage_size = encoded_tags_len;
+			}
+
+			char* p = m_storage;
+
+			for(it = eparser->m_tags.begin(), sit = eparser->m_taglens.begin(); 
+				it != eparser->m_tags.end(); ++it, ++sit)
+			{
+				memcpy(p, *it, (*sit));
+				p += (*sit);
+				*p++ = ',';
+			}
+
+			if(p != m_storage)
+			{
+				*--p = 0;
+			}
+			else
+			{
+				*p = 0;
+			}
+
+			return (uint8_t*)m_storage;
+		}
+	case TYPE_APPEVT_TAG:
+		{
+			char* res = NULL;
+
+			if(m_argid >= 0)
+			{
+				if(m_argid < (int32_t)eparser->m_tags.size())
+				{
+					res = eparser->m_tags[m_argid];
+				}
+			}
+			else
+			{
+				int32_t id = (int32_t)eparser->m_tags.size() + m_argid;
+
+				if(id >= 0)
+				{
+					res = eparser->m_tags[id];
+				}
+			}
+
+			return (uint8_t*)res;
+		}
+*/
+	case TYPE_APPEVT_ARGS:
+		{
+			vector<char*>::iterator nameit;
+			vector<char*>::iterator valit;
+			vector<uint32_t>::iterator namesit;
+			vector<uint32_t>::iterator valsit;
+
+			uint32_t nargs = pae->m_argnames.size();
+			uint32_t encoded_args_len = pae->m_argnames_len + pae->m_argvals_len +
+				nargs + nargs + 2;
+
+			if(m_storage_size < encoded_args_len)
+			{
+				m_storage = (char*)realloc(m_storage, encoded_args_len);
+				m_storage_size = encoded_args_len;
+			}
+
+			char* p = m_storage;
+
+			for(nameit = pae->m_argnames.begin(), valit = pae->m_argvals.begin(), 
+				namesit = pae->m_argnamelens.begin(), valsit = pae->m_argvallens.begin(); 
+				nameit != pae->m_argnames.end(); 
+				++nameit, ++namesit, ++valit, ++valsit)
+			{
+				strcpy(p, *nameit);
+				p += (*namesit);
+				*p++ = ':';
+
+				memcpy(p, *valit, (*valsit));
+				p += (*valsit);
+				*p++ = ',';
+			}
+
+			if(p != m_storage)
+			{
+				*--p = 0;
+			}
+			else
+			{
+				*p = 0;
+			}
+
+			if(flt_compare(m_cmpop, PT_CHARBUF, 
+				m_storage,
+				&m_val_storage[0]) == true)
+			{
+				return true;
+			}
+			else
+			{
+				return false;
+			}
+		}
+	case TYPE_APPEVT_ARG:
+		{
+			char* val = NULL;
+
+			if(m_argid == TEXT_ARG_ID)
+			{
+				//
+				// Argument expressed as name, e.g. evt.appevt.arg.name.
+				// Scan the argname list and find the match.
+				//
+				uint32_t j;
+
+				for(j = 0; j < pae->m_nargs; j++)
+				{
+					if(strcmp(m_cargname, pae->m_argnames[j]) == 0)
+					{
+						val = pae->m_argvals[j];
+						break;
+					}
+				}
+			}
+			else
+			{
+				//
+				// Argument expressed as id, e.g. evt.appevt.arg[1].
+				// Pick the corresponding value.
+				//
+				if(m_argid >= 0)
+				{
+					if(m_argid < (int32_t)pae->m_nargs)
+					{
+						val = pae->m_argvals[m_argid];
+					}
+				}
+				else
+				{
+					int32_t id = (int32_t)pae->m_nargs + m_argid;
+
+					if(id >= 0)
+					{
+						val = pae->m_argvals[id];
+					}
+				}
+			}
+
+			if(val == NULL)
+			{
+				return false;
+			}
+
+			if(flt_compare(m_cmpop, PT_CHARBUF, 
+				val,
+				&m_val_storage[0]) == true)
+			{
+				return true;
+			}
+			else
+			{
+				return false;
+			}
+		}
+	default:
+		ASSERT(false);
+		break;
+	}
+
+	return NULL;
+}
+
 bool sinsp_filter_check_event::compare(sinsp_evt *evt)
 {
 	bool res;
 
 	m_is_compare = true;
+
 	if(m_field_id == TYPE_ARGRAW)
 	{
 		uint32_t len;
@@ -1974,20 +2273,73 @@ bool sinsp_filter_check_event::compare(sinsp_evt *evt)
 
 		if(extracted_val == NULL)
 		{
-			return false;
+			res = false;
+		}
+		else
+		{
+			ASSERT(m_arginfo != NULL);
+
+			res = flt_compare(m_cmpop,
+				m_arginfo->type, 
+				extracted_val, 
+				&m_val_storage[0]);
+		}
+	}
+	else if(m_field_id >= TYPE_APPEVT_ID && m_field_id <= TYPE_APPEVT_ARG)
+	{
+		list<sinsp_partial_appevt*>* partial_appevts_list = &m_inspector->m_partial_appevts_list;
+		list<sinsp_partial_appevt*>::iterator it;
+		uint16_t etype = evt->get_type();
+
+		sinsp_threadinfo* tinfo = evt->get_thread_info();
+		if(tinfo == NULL)
+		{
+			return NULL;
 		}
 
-		ASSERT(m_arginfo != NULL);
+		//
+		// Scan the list and see if there's a match
+		//
+		for(it = partial_appevts_list->begin(); it != partial_appevts_list->end(); ++it)
+		{
+			if(compare_appevt(evt, *it) == true)
+			{
+				res = true;
+				goto fcec_end;
+			}
+		}
 
-		res = flt_compare(m_cmpop,
-			m_arginfo->type, 
-			extracted_val, 
-			&m_val_storage[0]);
+		//
+		// For PPME_USER_X events, it's possible that the pae is already returned to the pool.
+		// Get it from the parser.
+		//
+		if(etype == PPME_USER_X)
+		{
+			sinsp_appevtparser* eparser = tinfo->m_appevt_parser;
+
+			if(eparser == NULL)
+			{
+				ASSERT(false);
+				return false;
+			}
+
+			ASSERT(eparser->m_enter_pae);
+
+			if(compare_appevt(evt, eparser->m_enter_pae) == true)
+			{
+				res = true;
+				goto fcec_end;
+			}
+		}
+
+		res = false;
 	}
 	else
 	{
 		res = sinsp_filter_check::compare(evt);
 	}
+
+fcec_end:
 	m_is_compare = false;
 
 	return res;
@@ -2268,15 +2620,15 @@ uint8_t* sinsp_filter_check_appevt::extract(sinsp_evt *evt, OUT uint32_t* len)
 	case TYPE_ID:
 		return (uint8_t*)&eparser->m_id;
 	case TYPE_NTAGS:
-		m_u32_storage = eparser->m_tags.size();
-		return (uint8_t*)&m_u32_storage;
+		m_u32val = eparser->m_tags.size();
+		return (uint8_t*)&m_u32val;
 	case TYPE_NARGS:
 		{
 			sinsp_partial_appevt* pae = eparser->m_enter_pae;
 			ASSERT(pae);
 
-			m_u32_storage = pae->m_argvals.size();
-			return (uint8_t*)&m_u32_storage;
+			m_u32val = pae->m_argvals.size();
+			return (uint8_t*)&m_u32val;
 		}
 	case TYPE_TAGS:
 		{
@@ -2402,6 +2754,7 @@ uint8_t* sinsp_filter_check_appevt::extract(sinsp_evt *evt, OUT uint32_t* len)
 					if(strcmp(m_cargname, pae->m_argnames[j]) == 0)
 					{
 						res = pae->m_argvals[j];
+						break;
 					}
 				}
 			}
@@ -2436,8 +2789,8 @@ uint8_t* sinsp_filter_check_appevt::extract(sinsp_evt *evt, OUT uint32_t* len)
 			if(etype == PPME_USER_X)
 			{
 				ASSERT(eparser->m_enter_pae);
-				m_u64_storage = eparser->m_exit_pae.m_time - eparser->m_enter_pae->m_time;
-				return (uint8_t*)&m_u64_storage;
+				m_u64val = eparser->m_exit_pae.m_time - eparser->m_enter_pae->m_time;
+				return (uint8_t*)&m_u64val;
 			}
 			else
 			{

@@ -568,6 +568,7 @@ private:
 	friend class sinsp_analyzer_fd_listener;
 	friend class sinsp_chisel;
 	friend class sinsp_appevtparser;
+	friend class sinsp_filter_check_event;
 
 	template<class TKey,class THash,class TCompare> friend class sinsp_connection_manager;
 };
