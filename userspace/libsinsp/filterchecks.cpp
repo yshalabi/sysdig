@@ -2240,7 +2240,7 @@ int32_t sinsp_filter_check_appevt::parse_field_name(const char* str)
 
 uint8_t* sinsp_filter_check_appevt::extract(sinsp_evt *evt, OUT uint32_t* len)
 {
-	sinsp_appevtparser* aep;
+	sinsp_appevtparser* eparser;
 	sinsp_threadinfo* tinfo = evt->get_thread_info();
 	uint16_t etype = evt->get_type();
 
@@ -2254,9 +2254,9 @@ uint8_t* sinsp_filter_check_appevt::extract(sinsp_evt *evt, OUT uint32_t* len)
 		return NULL;
 	}
 
-	aep = tinfo->m_appevt_parser;
+	eparser = tinfo->m_appevt_parser;
 
-	if(aep == NULL)
+	if(eparser == NULL)
 	{
 		return NULL;
 	}
@@ -2264,14 +2264,14 @@ uint8_t* sinsp_filter_check_appevt::extract(sinsp_evt *evt, OUT uint32_t* len)
 	switch(m_field_id)
 	{
 	case TYPE_ID:
-		return (uint8_t*)&aep->m_id;
+		return (uint8_t*)&eparser->m_id;
 	case TYPE_TAGS:
 		{
 			vector<char*>::iterator it;
 			vector<uint32_t>::iterator sit;
 
-			uint32_t ntags = aep->m_tags.size();
-			uint32_t encoded_tags_len = aep->m_tot_taglens + ntags + 1;
+			uint32_t ntags = eparser->m_tags.size();
+			uint32_t encoded_tags_len = eparser->m_tot_taglens + ntags + 1;
 
 			if(m_storage_size < encoded_tags_len)
 			{
@@ -2281,8 +2281,8 @@ uint8_t* sinsp_filter_check_appevt::extract(sinsp_evt *evt, OUT uint32_t* len)
 
 			char* p = m_storage;
 
-			for(it = aep->m_tags.begin(), sit = aep->m_taglens.begin(); 
-				it != aep->m_tags.end(); ++it, ++sit)
+			for(it = eparser->m_tags.begin(), sit = eparser->m_taglens.begin(); 
+				it != eparser->m_tags.end(); ++it, ++sit)
 			{
 				memcpy(p, *it, (*sit));
 				p += (*sit);
@@ -2306,18 +2306,18 @@ uint8_t* sinsp_filter_check_appevt::extract(sinsp_evt *evt, OUT uint32_t* len)
 
 			if(m_argid >= 0)
 			{
-				if(m_argid < (int32_t)aep->m_tags.size())
+				if(m_argid < (int32_t)eparser->m_tags.size())
 				{
-					res = aep->m_tags[m_argid];
+					res = eparser->m_tags[m_argid];
 				}
 			}
 			else
 			{
-				int32_t id = (int32_t)aep->m_tags.size() + m_argid;
+				int32_t id = (int32_t)eparser->m_tags.size() + m_argid;
 
 				if(id >= 0)
 				{
-					res = aep->m_tags[id];
+					res = eparser->m_tags[id];
 				}
 			}
 
@@ -2326,14 +2326,7 @@ uint8_t* sinsp_filter_check_appevt::extract(sinsp_evt *evt, OUT uint32_t* len)
 	case TYPE_ARGS:
 		{
 			sinsp_partial_appevt* pae;
-			if(etype == PPME_USER_E)
-			{
-				pae = aep->m_enter_pae;
-			}
-			else
-			{
-				pae = &aep->m_exit_pae;
-			}
+			pae = eparser->m_enter_pae;
 
 			vector<char*>::iterator nameit;
 			vector<char*>::iterator valit;
@@ -2352,15 +2345,12 @@ uint8_t* sinsp_filter_check_appevt::extract(sinsp_evt *evt, OUT uint32_t* len)
 
 			char* p = m_storage;
 
-			ASSERT(false);
-			return NULL;
-/*
 			for(nameit = pae->m_argnames.begin(), valit = pae->m_argvals.begin(), 
 				namesit = pae->m_argnamelens.begin(), valsit = pae->m_argvallens.begin(); 
 				nameit != pae->m_argnames.end(); 
 				++nameit, ++namesit, ++valit, ++valsit)
 			{
-				memcpy(p, *nameit, (*namesit));
+				strcpy(p, *nameit);
 				p += (*namesit);
 				*p++ = ':';
 
@@ -2379,12 +2369,11 @@ uint8_t* sinsp_filter_check_appevt::extract(sinsp_evt *evt, OUT uint32_t* len)
 			}
 
 			return (uint8_t*)m_storage;
-*/
 		}
 	case TYPE_ARG:
 		{
 			char* res = NULL;
-			sinsp_partial_appevt* pae = aep->m_enter_pae;
+			sinsp_partial_appevt* pae = eparser->m_enter_pae;
 			ASSERT(pae);
 
 			if(m_argid == TEXT_ARG_ID)
@@ -2433,8 +2422,8 @@ uint8_t* sinsp_filter_check_appevt::extract(sinsp_evt *evt, OUT uint32_t* len)
 		{
 			if(etype == PPME_USER_X)
 			{
-				ASSERT(aep->m_enter_pae);
-				m_u64_storage = aep->m_exit_pae.m_time - aep->m_enter_pae->m_time;
+				ASSERT(eparser->m_enter_pae);
+				m_u64_storage = eparser->m_exit_pae.m_time - eparser->m_enter_pae->m_time;
 				return (uint8_t*)&m_u64_storage;
 			}
 			else

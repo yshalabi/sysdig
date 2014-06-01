@@ -81,6 +81,8 @@ public:
 	uint64_t m_id;
 	vector<char*> m_argnames;
 	vector<char*> m_argvals;
+	vector<uint32_t> m_argnamelens;
+	vector<uint32_t> m_argvallens;
 	uint32_t m_nargs;
 
 	uint64_t m_time;
@@ -896,6 +898,8 @@ VISIBILITY_PRIVATE
 		//
 		// Pack the argnames
 		//
+		pae->m_argnames.clear();
+		pae->m_argnamelens.clear();
 		pae->m_nargs = m_argnames.size();
 		uint32_t encoded_argnames_len = m_tot_argnamelens + pae->m_nargs + 1;
 
@@ -911,6 +915,7 @@ VISIBILITY_PRIVATE
 		{
 			memcpy(p, *it, (*sit) + 1);
 			pae->m_argnames.push_back(p);
+			pae->m_argnamelens.push_back(*sit);
 			p += (*sit) + 1;
 		}
 
@@ -920,6 +925,8 @@ VISIBILITY_PRIVATE
 		//
 		// Pack the argvals
 		//
+		pae->m_argvals.clear();
+		pae->m_argvallens.clear();
 		uint32_t encoded_argvals_len = m_tot_argvallens + pae->m_nargs + 1;
 
 		if(pae->m_argvals_storage_size < encoded_argvals_len)
@@ -934,6 +941,7 @@ VISIBILITY_PRIVATE
 		{
 			memcpy(p, *it, (*sit) + 1);
 			pae->m_argvals.push_back(p);
+			pae->m_argvallens.push_back(*sit);
 			p += (*sit) + 1;
 		}
 
