@@ -2057,14 +2057,18 @@ inline bool sinsp_filter_check_event::compare_appevt(sinsp_evt *evt, sinsp_parti
 			return false;
 		}
 	case TYPE_APPEVT_NTAGS:
-		//
-		// Not yet implemented
-		//
+		m_u32val = pae->m_tags.size();
 
-		//m_u32val = eparser->m_tags.size();
-		//return (uint8_t*)&m_u32val;
-		ASSERT(false);
-		return false;
+		if(flt_compare(m_cmpop, PT_UINT32, 
+			&m_u32val,
+			&m_val_storage[0]) == true)
+		{
+			return true;
+		}
+		else
+		{
+			return false;
+		}
 	case TYPE_APPEVT_NARGS:
 		m_u32val = pae->m_argvals.size();
 
@@ -2078,14 +2082,12 @@ inline bool sinsp_filter_check_event::compare_appevt(sinsp_evt *evt, sinsp_parti
 		{
 			return false;
 		}
-/*
 	case TYPE_APPEVT_TAGS:
 		{
 			vector<char*>::iterator it;
 			vector<uint32_t>::iterator sit;
 
-			uint32_t ntags = eparser->m_tags.size();
-			uint32_t encoded_tags_len = eparser->m_tot_taglens + ntags + 1;
+			uint32_t encoded_tags_len = pae->m_tags_len + pae->m_ntags + 1;
 
 			if(m_storage_size < encoded_tags_len)
 			{
@@ -2095,8 +2097,8 @@ inline bool sinsp_filter_check_event::compare_appevt(sinsp_evt *evt, sinsp_parti
 
 			char* p = m_storage;
 
-			for(it = eparser->m_tags.begin(), sit = eparser->m_taglens.begin(); 
-				it != eparser->m_tags.end(); ++it, ++sit)
+			for(it = pae->m_tags.begin(), sit = pae->m_taglens.begin(); 
+				it != pae->m_tags.end(); ++it, ++sit)
 			{
 				memcpy(p, *it, (*sit));
 				p += (*sit);
@@ -2112,32 +2114,54 @@ inline bool sinsp_filter_check_event::compare_appevt(sinsp_evt *evt, sinsp_parti
 				*p = 0;
 			}
 
-			return (uint8_t*)m_storage;
+			if(flt_compare(m_cmpop, PT_CHARBUF, 
+				m_storage,
+				&m_val_storage[0]) == true)
+			{
+				return true;
+			}
+			else
+			{
+				return false;
+			}
 		}
 	case TYPE_APPEVT_TAG:
 		{
-			char* res = NULL;
+			char* val = NULL;
 
 			if(m_argid >= 0)
 			{
-				if(m_argid < (int32_t)eparser->m_tags.size())
+				if(m_argid < (int32_t)pae->m_ntags)
 				{
-					res = eparser->m_tags[m_argid];
+					val = pae->m_tags[m_argid];
 				}
 			}
 			else
 			{
-				int32_t id = (int32_t)eparser->m_tags.size() + m_argid;
+				int32_t id = (int32_t)pae->m_ntags + m_argid;
 
 				if(id >= 0)
 				{
-					res = eparser->m_tags[id];
+					val = pae->m_tags[id];
 				}
 			}
 
-			return (uint8_t*)res;
+			if(val == NULL)
+			{
+				return false;
+			}
+
+			if(flt_compare(m_cmpop, PT_CHARBUF, 
+				val,
+				&m_val_storage[0]) == true)
+			{
+				return true;
+			}
+			else
+			{
+				return false;
+			}
 		}
-*/
 	case TYPE_APPEVT_ARGS:
 		{
 			vector<char*>::iterator nameit;

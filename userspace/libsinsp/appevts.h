@@ -79,10 +79,13 @@ public:
 	uint32_t m_argnames_storage_size;
 	uint32_t m_argvals_storage_size;
 	uint64_t m_id;
+	vector<char*> m_tags;
 	vector<char*> m_argnames;
 	vector<char*> m_argvals;
+	vector<uint32_t> m_taglens;
 	vector<uint32_t> m_argnamelens;
 	vector<uint32_t> m_argvallens;
+	uint32_t m_ntags;
 	uint32_t m_nargs;
 
 	uint64_t m_time;
@@ -874,8 +877,10 @@ VISIBILITY_PRIVATE
 		//
 		// Pack the tags
 		//
-		uint32_t ntags = m_tags.size();
-		uint32_t encoded_tags_len = m_tot_taglens + ntags + 1;
+		pae->m_tags.clear();
+		pae->m_taglens.clear();
+		pae->m_ntags = m_tags.size();
+		uint32_t encoded_tags_len = m_tot_taglens + pae->m_ntags + 1;
 
 		if(pae->m_tags_storage_size < encoded_tags_len)
 		{
@@ -888,6 +893,8 @@ VISIBILITY_PRIVATE
 			it != m_tags.end(); ++it, ++sit)
 		{
 			memcpy(p, *it, (*sit) + 1);
+			pae->m_tags.push_back(p);
+			pae->m_taglens.push_back(*sit);
 			p += (*sit) + 1;
 		}
 
