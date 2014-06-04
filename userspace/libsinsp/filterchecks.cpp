@@ -1580,11 +1580,6 @@ Json::Value sinsp_filter_check_event::extract_as_js(sinsp_evt *evt, OUT uint32_t
 
 uint8_t* sinsp_filter_check_event::extract(sinsp_evt *evt, OUT uint32_t* len)
 {
-	if(m_field_id >= TYPE_APPEVT_ID && m_field_id <= TYPE_APPEVT_ARG)
-	{
-		int a = 0;
-	}
-
 	switch(m_field_id)
 	{
 	case TYPE_TIME:
