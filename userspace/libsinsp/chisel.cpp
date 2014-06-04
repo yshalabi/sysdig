@@ -53,6 +53,10 @@ extern sinsp_evttables g_infotables;
 // For Lua debugging
 ///////////////////////////////////////////////////////////////////////////////
 #ifdef HAS_LUA_CHISELS
+#if 0
+//
+// Useful when debugging the lua interface
+//
 void lua_stackdump(lua_State *L) 
 {
 	int i;
@@ -85,6 +89,26 @@ void lua_stackdump(lua_State *L)
 
 	printf("\n");  // end the listing
 }
+#endif
+
+#if defined(_WIN32) && !defined(_WIN64)
+//
+// Essentially, there is no way to cleanly return an error from C++ to Lua in
+// x86 windows, therefore we just print the error and exit
+//
+void sinsp_lua_error(lua_State *ls, string errorstr)
+{
+	cerr << errorstr << endl;
+	exit(0);
+}
+#else
+void sinsp_lua_error(lua_State *ls, string errorstr)
+{
+	luaL_error(ls, errorstr.c_str());
+	ASSERT(false);
+}
+#endif
+
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -185,7 +209,8 @@ public:
 				}
 			default:
 				ASSERT(false);
-				throw sinsp_exception("wrong event type " + to_string((long long) finfo->m_type));
+				sinsp_lua_error(ls, "wrong event type " + to_string((long long) finfo->m_type));
+				return 0;
 		}
 	}
 
@@ -197,7 +222,7 @@ public:
 
 		if(evt == NULL)
 		{
-			throw sinsp_exception("invalid call to evt.get_num()");
+			sinsp_lua_error(ls, "invalid call to evt.get_num()");
 		}
 
 		lua_pushnumber(ls, (double)evt->get_num());
@@ -212,7 +237,7 @@ public:
 
 		if(evt == NULL)
 		{
-			throw sinsp_exception("invalid call to evt.get_ts()");
+			sinsp_lua_error(ls, "invalid call to evt.get_ts()");
 		}
 
 		uint64_t ts = evt->get_ts();
@@ -230,7 +255,7 @@ public:
 
 		if(evt == NULL)
 		{
-			throw sinsp_exception("invalid call to evt.get_type()");
+			sinsp_lua_error(ls, "invalid call to evt.get_type()");
 		}
 
 		const char* evname;
@@ -262,7 +287,7 @@ public:
 
 		if(evt == NULL)
 		{
-			throw sinsp_exception("invalid call to evt.get_cpuid()");
+			sinsp_lua_error(ls, "invalid call to evt.get_cpuid()");
 		}
 
 		uint32_t cpuid = evt->get_cpuid();
@@ -284,7 +309,7 @@ public:
 
 		if(fld == NULL)
 		{
-			throw sinsp_exception("chisel requesting nil field");
+			sinsp_lua_error(ls, "chisel requesting nil field");
 		}
 
 		sinsp_filter_check* chk = g_filterlist.new_filter_check_from_fldname(fld,
@@ -293,7 +318,7 @@ public:
 
 		if(chk == NULL)
 		{
-			throw sinsp_exception("chisel requesting nonexistent field " + string(fld));
+			sinsp_lua_error(ls, string("chisel requesting nonexistent field ") + fld);
 		}
 
 		chk->parse_field_name(fld);
@@ -313,7 +338,7 @@ public:
 
 		if(evt == NULL)
 		{
-			throw sinsp_exception("invalid call to evt.field()");
+			sinsp_lua_error(ls, "invalid call to evt.field()");
 		}
 
 		sinsp_filter_check* chk = (sinsp_filter_check*)lua_topointer(ls, 1);
@@ -538,7 +563,7 @@ public:
 		const char* chname = lua_tostring(ls, 1);
 		if(chname == NULL)
 		{
-			throw sinsp_exception("invalid exec field name in chisel " + ch->m_filename);
+			sinsp_lua_error(ls, "invalid exec field name in chisel " + ch->m_filename);
 		}
 
 		ch->m_new_chisel_to_exec = chname;
@@ -753,7 +778,7 @@ void parse_lua_chisel_arg(lua_State *ls, OUT chisel_desc* cd)
 		}
 		else
 		{
-			throw sinsp_exception(string(lua_tostring(ls, -2)) + " is not a string");
+			sinsp_lua_error(ls, string(lua_tostring(ls, -2)) + " is not a string");
 		}
 
 		lua_pop(ls, 1);
@@ -779,7 +804,7 @@ void parse_lua_chisel_args(lua_State *ls, OUT chisel_desc* cd)
 		}
 		else
 		{
-			throw sinsp_exception(string(lua_tostring(ls, -2)) + " is not a string");
+			sinsp_lua_error(ls, string(lua_tostring(ls, -2)) + " is not a string");
 		}
 
 		lua_pop(ls, 1);

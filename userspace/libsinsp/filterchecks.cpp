@@ -1290,7 +1290,7 @@ int32_t sinsp_filter_check_event::extract_appevt_arg(string fldname, string val,
 			throw sinsp_exception("appevt field must be expressed explicitly");
 		}
 
-		parsed_len = val.find(']');
+		parsed_len = (uint32_t)val.find(']');
 		string numstr = val.substr(fldname.size() + 1, parsed_len - fldname.size() - 1);
 		m_argid = sinsp_numparser::parsed32(numstr);
 		parsed_len++;
@@ -1304,7 +1304,7 @@ int32_t sinsp_filter_check_event::extract_appevt_arg(string fldname, string val,
 
 		m_argname = val.substr(fldname.size() + 1);
 		m_cargname = m_argname.c_str();
-		parsed_len = fldname.size() + m_argname.size() + 1;
+		parsed_len = (uint32_t)(fldname.size() + m_argname.size() + 1);
 		m_argid = TEXT_ARG_ID;
 	}
 	else
@@ -2057,7 +2057,7 @@ inline bool sinsp_filter_check_event::compare_appevt(sinsp_evt *evt, sinsp_parti
 			return false;
 		}
 	case TYPE_APPEVT_NTAGS:
-		m_u32val = pae->m_tags.size();
+		m_u32val = (uint32_t)pae->m_tags.size();
 
 		if(flt_compare(m_cmpop, PT_UINT32, 
 			&m_u32val,
@@ -2070,7 +2070,7 @@ inline bool sinsp_filter_check_event::compare_appevt(sinsp_evt *evt, sinsp_parti
 			return false;
 		}
 	case TYPE_APPEVT_NARGS:
-		m_u32val = pae->m_argvals.size();
+		m_u32val = (uint32_t)pae->m_argvals.size();
 
 		if(flt_compare(m_cmpop, PT_UINT32, 
 			&m_u32val,
@@ -2169,7 +2169,7 @@ inline bool sinsp_filter_check_event::compare_appevt(sinsp_evt *evt, sinsp_parti
 			vector<uint32_t>::iterator namesit;
 			vector<uint32_t>::iterator valsit;
 
-			uint32_t nargs = pae->m_argnames.size();
+			uint32_t nargs = (uint32_t)pae->m_argnames.size();
 			uint32_t encoded_args_len = pae->m_argnames_len + pae->m_argvals_len +
 				nargs + nargs + 2;
 
@@ -2562,7 +2562,7 @@ int32_t sinsp_filter_check_appevt::extract_arg(string fldname, string val, OUT c
 			throw sinsp_exception("appevt field must be expressed explicitly");
 		}
 
-		parsed_len = val.find(']');
+		parsed_len = (uint32_t)val.find(']');
 		string numstr = val.substr(fldname.size() + 1, parsed_len - fldname.size() - 1);
 		m_argid = sinsp_numparser::parsed32(numstr);
 		parsed_len++;
@@ -2576,7 +2576,7 @@ int32_t sinsp_filter_check_appevt::extract_arg(string fldname, string val, OUT c
 
 		m_argname = val.substr(fldname.size() + 1);
 		m_cargname = m_argname.c_str();
-		parsed_len = fldname.size() + m_argname.size() + 1;
+		parsed_len = (uint32_t)(fldname.size() + m_argname.size() + 1);
 		m_argid = TEXT_ARG_ID;
 	}
 	else
@@ -2644,14 +2644,14 @@ uint8_t* sinsp_filter_check_appevt::extract(sinsp_evt *evt, OUT uint32_t* len)
 	case TYPE_ID:
 		return (uint8_t*)&eparser->m_id;
 	case TYPE_NTAGS:
-		m_u32val = eparser->m_tags.size();
+		m_u32val = (uint32_t)eparser->m_tags.size();
 		return (uint8_t*)&m_u32val;
 	case TYPE_NARGS:
 		{
 			sinsp_partial_appevt* pae = eparser->m_enter_pae;
 			ASSERT(pae);
 
-			m_u32val = pae->m_argvals.size();
+			m_u32val = (uint32_t)pae->m_argvals.size();
 			return (uint8_t*)&m_u32val;
 		}
 	case TYPE_TAGS:
@@ -2659,7 +2659,7 @@ uint8_t* sinsp_filter_check_appevt::extract(sinsp_evt *evt, OUT uint32_t* len)
 			vector<char*>::iterator it;
 			vector<uint32_t>::iterator sit;
 
-			uint32_t ntags = eparser->m_tags.size();
+			uint32_t ntags = (uint32_t)eparser->m_tags.size();
 			uint32_t encoded_tags_len = eparser->m_tot_taglens + ntags + 1;
 
 			if(m_storage_size < encoded_tags_len)
@@ -2722,7 +2722,7 @@ uint8_t* sinsp_filter_check_appevt::extract(sinsp_evt *evt, OUT uint32_t* len)
 			vector<uint32_t>::iterator namesit;
 			vector<uint32_t>::iterator valsit;
 
-			uint32_t nargs = pae->m_argnames.size();
+			uint32_t nargs = (uint32_t)pae->m_argnames.size();
 			uint32_t encoded_args_len = pae->m_argnames_len + pae->m_argvals_len +
 				nargs + nargs + 2;
 

@@ -188,7 +188,7 @@ public:
 			}
 			else
 			{
-				uint32_t tlen = m_fullfragment_storage_str.length();
+				uint32_t tlen = (uint32_t)m_fullfragment_storage_str.length();
 
 				memcpy(m_storage, 
 					m_fullfragment_storage_str.c_str(), 
@@ -537,7 +537,7 @@ VISIBILITY_PRIVATE
 			p++;
 		}
 
-		*delta = p - start;
+		*delta = (uint32_t)(p - start);
 		return sinsp_appevtparser::RES_OK;
 	}
 
@@ -574,7 +574,7 @@ VISIBILITY_PRIVATE
 			return sinsp_appevtparser::RES_FAILED;
 		}
 
-		*delta = p - start;
+		*delta = (uint32_t)(p - start);
 		return sinsp_appevtparser::RES_OK;
 	}
 
@@ -602,7 +602,7 @@ VISIBILITY_PRIVATE
 			return sinsp_appevtparser::RES_FAILED;
 		}
 
-		*delta = p - start;
+		*delta = (uint32_t)(p - start);
 		return sinsp_appevtparser::RES_OK;
 	}
 
@@ -642,7 +642,7 @@ VISIBILITY_PRIVATE
 			return sinsp_appevtparser::RES_FAILED;
 		}
 
-		*delta = p - start;
+		*delta = (uint32_t)(p - start);
 		return sinsp_appevtparser::RES_OK;
 	}
 
@@ -680,7 +680,7 @@ VISIBILITY_PRIVATE
 			return sinsp_appevtparser::RES_FAILED;
 		}
 
-		*delta = p - start;
+		*delta = (uint32_t)(p - start);
 		return sinsp_appevtparser::RES_OK;
 	}
 
@@ -732,7 +732,7 @@ VISIBILITY_PRIVATE
 			}
 		}
 
-		*delta = p - start;
+		*delta = (uint32_t)(p - start);
 		return sinsp_appevtparser::RES_OK;
 	}
 
@@ -743,7 +743,7 @@ VISIBILITY_PRIVATE
 
 		if(*p != '"')
 		{
-			*delta = (p - initial + 1);
+			*delta = (uint32_t)(p - initial + 1);
 			if(*p == 0)
 			{
 				return sinsp_appevtparser::RES_TRUNCATED;
@@ -761,7 +761,7 @@ VISIBILITY_PRIVATE
 		{
 			if(*p == 0)
 			{
-				*delta = (p - initial + 1);
+				*delta = (uint32_t)(p - initial + 1);
 				return sinsp_appevtparser::RES_TRUNCATED;
 			}
 
@@ -770,7 +770,7 @@ VISIBILITY_PRIVATE
 
 		*p = 0;
 
-		*delta = (p - initial + 1);
+		*delta = (uint32_t)(p - initial + 1);
 		return sinsp_appevtparser::RES_OK;
 	}
 
@@ -823,7 +823,7 @@ VISIBILITY_PRIVATE
 		*p = 0;
 
 		*res = val;
-		*delta = (p - start + 1);
+		*delta = (uint32_t)(p - start + 1);
 		return retval;
 	}
 
@@ -879,7 +879,7 @@ VISIBILITY_PRIVATE
 		//
 		pae->m_tags.clear();
 		pae->m_taglens.clear();
-		pae->m_ntags = m_tags.size();
+		pae->m_ntags = (uint32_t)m_tags.size();
 		uint32_t encoded_tags_len = m_tot_taglens + pae->m_ntags + 1;
 
 		if(pae->m_tags_storage_size < encoded_tags_len)
@@ -899,14 +899,14 @@ VISIBILITY_PRIVATE
 		}
 
 		*p++ = 0;
-		pae->m_tags_len = p - pae->m_tags_storage;
+		pae->m_tags_len = (uint32_t)(p - pae->m_tags_storage);
 
 		//
 		// Pack the argnames
 		//
 		pae->m_argnames.clear();
 		pae->m_argnamelens.clear();
-		pae->m_nargs = m_argnames.size();
+		pae->m_nargs = (uint32_t)m_argnames.size();
 		uint32_t encoded_argnames_len = m_tot_argnamelens + pae->m_nargs + 1;
 
 		if(pae->m_argnames_storage_size < encoded_argnames_len)
@@ -926,7 +926,7 @@ VISIBILITY_PRIVATE
 		}
 
 		*p++ = 0;
-		pae->m_argnames_len = p - pae->m_argnames_storage;
+		pae->m_argnames_len = (uint32_t)(p - pae->m_argnames_storage);
 
 		//
 		// Pack the argvals
@@ -952,7 +952,7 @@ VISIBILITY_PRIVATE
 		}
 
 		*p++ = 0;
-		pae->m_argvals_len = p - pae->m_argvals_storage;
+		pae->m_argvals_len = (uint32_t)(p - pae->m_argvals_storage);
 	}
 
 	sinsp *m_inspector;

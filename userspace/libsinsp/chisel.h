@@ -75,7 +75,6 @@ public:
 	vector<chiselarg_desc> m_args;
 };
 
-
 class chiselinfo
 {
 public:
