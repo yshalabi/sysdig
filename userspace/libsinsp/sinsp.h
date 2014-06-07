@@ -452,7 +452,10 @@ public:
 	bool is_debug_enabled();
 
 	/*!
-	  \brief XXX.
+	  \brief Return the progress when reading trace files.
+
+	  \return File progress percentage. 0 means beginning of file, 100 means 
+	   end of file.
 	*/
 	double get_read_progress();
 
@@ -462,6 +465,12 @@ public:
 	void stop_dropping_mode();
 	void start_dropping_mode(uint32_t sampling_ratio);
 	void import_ipv4_interface(const sinsp_ipv4_ifinfo& ifinfo);
+	//
+	// Used by filters to enable app event state tracking, which is disabled
+	// by default for performance reasons
+	//
+	void request_appevt_state_tracking();
+
 	//
 	// Allocates private state in the thread info class.
 	// Returns the ID to use when retrieving the memory area.
@@ -554,6 +563,7 @@ private:
 	//
 	// App events 
 	//
+	bool m_track_appevts_state;
 	list<sinsp_partial_appevt*> m_partial_appevts_list;
 	simple_lifo_queue<sinsp_partial_appevt>* m_partial_appevts_pool;
 

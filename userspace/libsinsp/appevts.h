@@ -208,7 +208,17 @@ public:
 		//
 #ifdef DR_TEST_APPEVT_PARSER
 		return sinsp_appevtparser::RES_OK;
-#endif		
+#endif
+
+		//
+		// Event decoding done. We do state tracking only if explicitly requested
+		// by one or more filters.
+		//
+		if(m_inspector->m_track_appevts_state == false)
+		{
+			return sinsp_appevtparser::RES_OK;
+		}
+
 		//
 		// If this is an enter event, allocate a sinsp_partial_appevt object and
 		// push it to the list

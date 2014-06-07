@@ -76,6 +76,7 @@ sinsp::sinsp() :
 	m_buffer_format = sinsp_evt::PF_NORMAL;
 	m_isdebug_enabled = false;
 	m_filesize = -1;
+	m_track_appevts_state = false;
 }
 
 sinsp::~sinsp()
@@ -851,4 +852,9 @@ double sinsp::get_read_progress()
 	}
 
 	return (double)fpos * 100 / m_filesize;
+}
+
+void sinsp::request_appevt_state_tracking()
+{
+	m_track_appevts_state = true;
 }

@@ -1317,6 +1317,7 @@ int32_t sinsp_filter_check_event::extract_appevt_arg(string fldname, string val,
 
 int32_t sinsp_filter_check_event::parse_field_name(const char* str)
 {
+	int32_t res;
 	string val(str);
 
 	//
@@ -1328,18 +1329,16 @@ int32_t sinsp_filter_check_event::parse_field_name(const char* str)
 		m_field_id = TYPE_ARGSTR;
 		m_field = &m_info.m_fields[m_field_id];
 
-		return extract_arg("evt.arg", val, NULL);
+		res = extract_arg("evt.arg", val, NULL);
 	}
 	else if(string(val, 0, sizeof("evt.rawarg") - 1) == "evt.rawarg")
 	{
 		m_field_id = TYPE_ARGRAW;
 		m_customfield = m_info.m_fields[m_field_id];
 
-		int32_t res = extract_arg("evt.rawarg", val, &m_arginfo);
+		res = extract_arg("evt.rawarg", val, &m_arginfo);
 
 		m_customfield.m_type = m_arginfo->type;
-
-		return res;
 	}
 	else if(string(val, 0, sizeof("evt.latency") - 1) == "evt.latency" ||
 		string(val, 0, sizeof("evt.latency.s") - 1) == "evt.latency.s" ||
@@ -1349,7 +1348,7 @@ int32_t sinsp_filter_check_event::parse_field_name(const char* str)
 		// These fields need to store the previuos event type in the thread state
 		//
 		m_th_state_id = m_inspector->reserve_thread_memory(sizeof(uint16_t));
-		return sinsp_filter_check::parse_field_name(str);
+		res = sinsp_filter_check::parse_field_name(str);
 	}
 	else if(string(val, 0, sizeof("evt.appevt.tag") - 1) == "evt.appevt.tag" &&
 		string(val, 0, sizeof("evt.appevt.tags") - 1) != "evt.appevt.tags")
@@ -1357,7 +1356,7 @@ int32_t sinsp_filter_check_event::parse_field_name(const char* str)
 		m_field_id = TYPE_APPEVT_TAG;
 		m_field = &m_info.m_fields[m_field_id];
 
-		return extract_appevt_arg("evt.appevt.tag", val, NULL);
+		res = extract_appevt_arg("evt.appevt.tag", val, NULL);
 	}
 	else if(string(val, 0, sizeof("evt.appevt.arg") - 1) == "evt.appevt.arg" &&
 		string(val, 0, sizeof("evt.appevt.args") - 1) != "evt.appevt.args")
@@ -1365,12 +1364,19 @@ int32_t sinsp_filter_check_event::parse_field_name(const char* str)
 		m_field_id = TYPE_APPEVT_ARG;
 		m_field = &m_info.m_fields[m_field_id];
 
-		return extract_appevt_arg("evt.appevt.arg", val, NULL);
+		res = extract_appevt_arg("evt.appevt.arg", val, NULL);
 	}
 	else
 	{
-		return sinsp_filter_check::parse_field_name(str);
+		res = sinsp_filter_check::parse_field_name(str);
 	}
+
+	if(m_field_id >= TYPE_APPEVT_ID && m_field_id <= TYPE_APPEVT_ARG)
+	{
+		m_inspector->request_appevt_state_tracking();
+	}
+
+	return res;
 }
 
 void sinsp_filter_check_event::parse_filter_value(const char* str, uint32_t len)

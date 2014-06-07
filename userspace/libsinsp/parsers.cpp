@@ -2084,6 +2084,7 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 		else
 		{
 			//
+			// Parsing error.
 			// We don't know the direction, so we use enter.
 			//
 			m_fake_userevt->type = PPME_USER_E;
