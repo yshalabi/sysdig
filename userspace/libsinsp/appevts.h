@@ -762,6 +762,9 @@ VISIBILITY_PRIVATE
 		char* initial = p;
 		*res = NULL;
 
+		//
+		// Make sure that we start with a \"
+		//
 		if(*p != '"')
 		{
 			*delta = (uint32_t)(p - initial + 1);
@@ -778,7 +781,10 @@ VISIBILITY_PRIVATE
 		*res = p + 1;
 		p++;
 
-		while(*p != '\"')
+		//
+		// Navigate to the end of the string
+		//
+		while(!(*p == '\"' && *(p - 1) != '\\'))
 		{
 			if(*p == 0)
 			{
