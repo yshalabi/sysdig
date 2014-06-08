@@ -137,6 +137,7 @@ public:
 			{
 				throw sinsp_exception("memory allocation error in sinsp_appevtparser::process_event_data.");
 			}
+
 			m_storage_size = m_fragment_size + datalen + 1;
 		}
 

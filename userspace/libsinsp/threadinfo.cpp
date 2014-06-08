@@ -896,34 +896,34 @@ void sinsp_thread_manager::remove_inactive_threads()
 	if(m_last_flush_time_ns == 0)
 	{
 		m_last_flush_time_ns = m_inspector->m_lastevent_ts;
+		for(threadinfo_map_iterator_t it = m_threadtable.begin(); it != m_threadtable.end(); ++it)
+		{
+			it->second.m_lastaccess_ts = m_inspector->m_lastevent_ts;
+		}
 	}
 
-	if(m_inspector->m_lastevent_ts > 
-		m_last_flush_time_ns + m_inspector->m_inactive_thread_scan_time_ns)
-	{
-		m_last_flush_time_ns = m_inspector->m_lastevent_ts;
+	m_last_flush_time_ns = m_inspector->m_lastevent_ts;
 
-		for(threadinfo_map_iterator_t it = m_threadtable.begin(); it != m_threadtable.end();)
+	for(threadinfo_map_iterator_t it = m_threadtable.begin(); it != m_threadtable.end();)
+	{
+		if(it->second.m_nchilds == 0 &&
+			m_inspector->m_lastevent_ts > 
+			it->second.m_lastaccess_ts + m_inspector->m_thread_timeout_ns)
 		{
-			if(it->second.m_nchilds == 0 &&
-				m_inspector->m_lastevent_ts > 
-				it->second.m_lastaccess_ts + m_inspector->m_thread_timeout_ns)
-			{
-				//
-				// Reset the cache
-				//
-				m_last_tid = 0;
-				m_last_tinfo = NULL;
+			//
+			// Reset the cache
+			//
+			m_last_tid = 0;
+			m_last_tinfo = NULL;
 
 #ifdef GATHER_INTERNAL_STATS
-				m_removed_threads->increment();
+			m_removed_threads->increment();
 #endif
-				m_threadtable.erase(it++);
-			}
-			else
-			{
-				++it;
-			}
+			m_threadtable.erase(it++);
+		}
+		else
+		{
+			++it;
 		}
 	}
 }

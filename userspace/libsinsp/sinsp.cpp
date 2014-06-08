@@ -409,7 +409,11 @@ int32_t sinsp::next(OUT sinsp_evt **evt)
 	//
 	// Run the periodic connection and thread table cleanup
 	//
-	m_thread_manager->remove_inactive_threads();
+	if(m_lastevent_ts > 
+		m_thread_manager->m_last_flush_time_ns + m_inactive_thread_scan_time_ns)
+	{
+		m_thread_manager->remove_inactive_threads();
+	}
 
 	//
 	// Deleayed removal of the fd, so that
