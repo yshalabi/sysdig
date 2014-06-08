@@ -123,6 +123,22 @@ public:
 		}
 	}
 
+	uint32_t get_storage_size()
+	{
+		return m_storage_size;
+	}
+
+	void set_storage_size(uint32_t newsize)
+	{
+		m_storage = (char*)realloc(m_storage, newsize);
+		if(m_storage == NULL)
+		{
+			throw sinsp_exception("memory allocation error in sinsp_appevtparser::process_event_data.");
+		}
+
+		m_storage_size = newsize;
+	}
+
 	inline sinsp_appevtparser::parse_result process_event_data(char *data, uint32_t datalen, uint64_t ts)
 	{
 		ASSERT(data != NULL);
@@ -132,13 +148,7 @@ public:
 		//
 		if(m_storage_size < m_fragment_size + datalen + 1)
 		{
-			m_storage = (char*)realloc(m_storage, m_fragment_size + datalen + 1);
-			if(m_storage == NULL)
-			{
-				throw sinsp_exception("memory allocation error in sinsp_appevtparser::process_event_data.");
-			}
-
-			m_storage_size = m_fragment_size + datalen + 1;
+			set_storage_size(m_fragment_size + datalen + 1);
 		}
 
 		memcpy(m_storage + m_fragment_size, data, datalen);

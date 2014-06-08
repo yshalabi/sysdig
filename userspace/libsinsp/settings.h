@@ -86,6 +86,11 @@ along with sysdig.  If not, see <http://www.gnu.org/licenses/>.
 #define MAX_USER_EVT_BUFFER 65536
 
 //
+// Size the user event buffer is brought back once in a while 
+//
+#define MIN_USER_EVT_BUFFER 256
+
+//
 // FD class customized with the storage we need
 //
 #ifdef HAS_ANALYZER

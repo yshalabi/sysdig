@@ -923,6 +923,14 @@ void sinsp_thread_manager::remove_inactive_threads()
 		}
 		else
 		{
+			if(it->second.m_appevt_parser != NULL)
+			{
+				if(it->second.m_appevt_parser->get_storage_size() > MIN_USER_EVT_BUFFER)
+				{
+					it->second.m_appevt_parser->set_storage_size(MIN_USER_EVT_BUFFER);
+				}
+			}
+
 			++it;
 		}
 	}
