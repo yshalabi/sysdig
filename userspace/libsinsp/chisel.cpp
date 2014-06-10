@@ -704,7 +704,7 @@ sinsp_chisel::sinsp_chisel(sinsp* inspector, string filename)
 {
 	m_inspector = inspector;
 	m_ls = NULL;
-	m_lua_has_handle_evt = false;
+	m_lua_has_on_event = false;
 	m_lua_is_first_evt = true;
 	m_lua_cinfo = NULL;
 	m_lua_last_interval_sample_time = 0;
@@ -1137,7 +1137,7 @@ void sinsp_chisel::load(string cmdstr)
 	lua_getglobal(m_ls, "on_event");
 	if(lua_isfunction(m_ls, -1))
 	{
-		m_lua_has_handle_evt = true;
+		m_lua_has_on_event = true;
 		lua_pop(m_ls, 1);
 	}
 #endif
@@ -1418,7 +1418,7 @@ bool sinsp_chisel::run(sinsp_evt* evt)
 	//
 	// If the script has the on_event callback, call it
 	//
-	if(m_lua_has_handle_evt)
+	if(m_lua_has_on_event)
 	{
 		lua_getglobal(m_ls, "on_event");
 			
@@ -1542,7 +1542,8 @@ void sinsp_chisel::on_capture_end()
 
 		if(lua_pcall(m_ls, 3, 0, 0) != 0) 
 		{
-			throw sinsp_exception(m_filename + " chisel error: " + lua_tostring(m_ls, -1));
+			string err = lua_tostring(m_ls, -1);
+			throw sinsp_exception(m_filename + " chisel error: " + err);
 		}
 
 		lua_pop(m_ls, 1);

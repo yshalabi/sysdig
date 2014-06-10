@@ -123,7 +123,7 @@ private:
 	string m_filename;
 	lua_State* m_ls;
 	chisel_desc m_lua_script_info;
-	bool m_lua_has_handle_evt;
+	bool m_lua_has_on_event;
 	bool m_lua_is_first_evt;
 	uint64_t m_lua_last_interval_sample_time;
 	uint64_t m_lua_last_interval_ts;
