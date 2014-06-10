@@ -2589,6 +2589,7 @@ int32_t sinsp_filter_check_appevt::extract_arg(string fldname, string val, OUT c
 
 int32_t sinsp_filter_check_appevt::parse_field_name(const char* str)
 {
+	int32_t res;
 	string val(str);
 
 	//
@@ -2600,7 +2601,7 @@ int32_t sinsp_filter_check_appevt::parse_field_name(const char* str)
 		m_field_id = TYPE_TAG;
 		m_field = &m_info.m_fields[m_field_id];
 
-		return extract_arg("appevt.tag", val, NULL);
+		res = extract_arg("appevt.tag", val, NULL);
 	}
 	else if(string(val, 0, sizeof("appevt.arg") - 1) == "appevt.arg" &&
 		string(val, 0, sizeof("appevt.args") - 1) != "appevt.args")
@@ -2608,12 +2609,19 @@ int32_t sinsp_filter_check_appevt::parse_field_name(const char* str)
 		m_field_id = TYPE_ARG;
 		m_field = &m_info.m_fields[m_field_id];
 
-		return extract_arg("appevt.arg", val, NULL);
+		res = extract_arg("appevt.arg", val, NULL);
 	}
 	else
 	{
-		return sinsp_filter_check::parse_field_name(str);
+		res = sinsp_filter_check::parse_field_name(str);
 	}
+
+	if(m_field_id == TYPE_LATENCY)
+	{
+		m_inspector->request_appevt_state_tracking();
+	}
+
+	return res;
 }
 
 uint8_t* sinsp_filter_check_appevt::extract(sinsp_evt *evt, OUT uint32_t* len)
