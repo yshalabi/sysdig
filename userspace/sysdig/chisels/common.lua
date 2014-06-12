@@ -55,7 +55,7 @@ end
 Extends a string to newlen with spaces
 ]]--
 function extend_string(s, newlen)
-	local ccs = "                                                                                                        "
+	local ccs = "                                                                                                                                                                       "
 	s = s .. string.sub(ccs, 0, newlen - string.len(s))
 	return s
 end
