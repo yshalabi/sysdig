@@ -374,7 +374,18 @@ void handle_end_of_file(bool print_progress)
 	//
 	// Notify the chisels that we're exiting.
 	//
-	chisels_on_capture_end();
+	try
+	{
+		chisels_on_capture_end();
+	}
+	catch(sinsp_exception& e)
+	{
+		cerr << e.what() << endl;
+	}
+	catch(...)
+	{
+		cerr << "Uknown error" << endl;
+	}
 }
 
 //
@@ -1070,6 +1081,7 @@ int main(int argc, char **argv)
 	}
 	catch(...)
 	{
+		cerr << "Uknown error" << endl;
 		handle_end_of_file(print_progress);
 		res = EXIT_FAILURE;
 	}
