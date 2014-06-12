@@ -116,7 +116,6 @@ local VALS_OFF = 20
 local KEYS_OFF = 10
 
 function datacube.print_table_normal(tbl, timedelta, depth)
---print("*" .. serialize_table(tbl))
 	local sorted_grtable = pairs_top_by_val(tbl, datacube.viz_info.top_number, function(t,a,b) return t[b][2] < t[a][2] end)
 
 	for k,v in sorted_grtable do
@@ -133,7 +132,9 @@ function datacube.print_table_normal(tbl, timedelta, depth)
 			end
 			
 			if datacube.viz_info.value_operations[j - 1] == datacube.OP_AVG then
-				val = val / v.cnt[j]
+				if v.cnt ~= nil and v.cnt[j] ~= nil then
+					val = val / v.cnt[j]
+				end
 			end
 			
 			if datacube.viz_info.valueunits[j - 1] == "none" then
