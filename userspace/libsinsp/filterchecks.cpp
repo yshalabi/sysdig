@@ -2347,7 +2347,10 @@ bool sinsp_filter_check_event::compare(sinsp_evt *evt)
 				return false;
 			}
 
-			ASSERT(eparser->m_enter_pae);
+			if(eparser->m_enter_pae == NULL)
+			{
+				return false;
+			}
 
 			if(compare_appevt(evt, eparser->m_enter_pae) == true)
 			{
@@ -2657,7 +2660,10 @@ uint8_t* sinsp_filter_check_appevt::extract(sinsp_evt *evt, OUT uint32_t* len)
 	case TYPE_NARGS:
 		{
 			sinsp_partial_appevt* pae = eparser->m_enter_pae;
-			ASSERT(pae);
+			if(pae == NULL)
+			{
+				return NULL;
+			}
 
 			m_u32val = (uint32_t)pae->m_argvals.size();
 			return (uint8_t*)&m_u32val;
@@ -2725,6 +2731,11 @@ uint8_t* sinsp_filter_check_appevt::extract(sinsp_evt *evt, OUT uint32_t* len)
 			sinsp_partial_appevt* pae;
 			pae = eparser->m_enter_pae;
 
+			if(pae == NULL)
+			{
+				return NULL;
+			}
+
 			vector<char*>::iterator nameit;
 			vector<char*>::iterator valit;
 			vector<uint32_t>::iterator namesit;
@@ -2771,7 +2782,10 @@ uint8_t* sinsp_filter_check_appevt::extract(sinsp_evt *evt, OUT uint32_t* len)
 		{
 			char* res = NULL;
 			sinsp_partial_appevt* pae = eparser->m_enter_pae;
-			ASSERT(pae);
+			if(pae == NULL)
+			{
+				return NULL;
+			}
 
 			if(m_argid == TEXT_ARG_ID)
 			{
@@ -2820,8 +2834,13 @@ uint8_t* sinsp_filter_check_appevt::extract(sinsp_evt *evt, OUT uint32_t* len)
 		{
 			if(etype == PPME_USER_X)
 			{
-				ASSERT(eparser->m_enter_pae);
-				m_u64val = eparser->m_exit_pae.m_time - eparser->m_enter_pae->m_time;
+				sinsp_partial_appevt* pae = eparser->m_enter_pae;
+				if(pae == NULL)
+				{
+					return NULL;
+				}
+
+				m_u64val = eparser->m_exit_pae.m_time - pae->m_time;
 				return (uint8_t*)&m_u64val;
 			}
 			else

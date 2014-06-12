@@ -278,7 +278,6 @@ public:
 			}
 
 			m_enter_pae = NULL;
-			ASSERT(false);
 		}
 
 		return sinsp_appevtparser::RES_OK;
