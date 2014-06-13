@@ -115,8 +115,19 @@ end
 local VALS_OFF = 20
 local KEYS_OFF = 10
 
+function compare_pairs(t,a,b)
+	local v1 = t[b][2]
+	local v2 = t[a][2]
+	
+	if v1 ~= nil or v2 ~= nil then
+		return v1 < v2
+	else
+		return b < a
+	end
+end
+
 function datacube.print_table_normal(tbl, timedelta, depth)
-	local sorted_grtable = pairs_top_by_val(tbl, datacube.viz_info.top_number, function(t,a,b) return t[b][2] < t[a][2] end)
+	local sorted_grtable = pairs_top_by_val(tbl, datacube.viz_info.top_number, compare_pairs)
 
 	for k,v in sorted_grtable do
 	

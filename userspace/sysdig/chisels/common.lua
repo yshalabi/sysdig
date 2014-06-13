@@ -22,7 +22,7 @@ This file contains a bunch of functions that are helpful in multiple scripts
 --[[ 
 Serialize the content of a table into a tring
 ]]--
-function serialize_table(val, name, skipnewlines, depth)
+function sr(val, name, skipnewlines, depth)
     skipnewlines = skipnewlines or false
     depth = depth or 0
 
@@ -34,7 +34,7 @@ function serialize_table(val, name, skipnewlines, depth)
         tmp = tmp .. "{" .. (not skipnewlines and "\n" or "")
 
         for k, v in pairs(val) do
-            tmp =  tmp .. serialize_table(v, k, skipnewlines, depth + 1) .. "," .. (not skipnewlines and "\n" or "")
+            tmp =  tmp .. sr(v, k, skipnewlines, depth + 1) .. "," .. (not skipnewlines and "\n" or "")
         end
 
         tmp = tmp .. string.rep(" ", depth) .. "}"
