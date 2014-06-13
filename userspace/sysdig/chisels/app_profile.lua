@@ -103,9 +103,11 @@ function on_event()
 	local latency = evt.field(flatency)
 	local ncalls = evt.field(fncalls)
 
-	local vals = {ncalls, latency, latency, latency, latency}
+	if latency ~= nil then
+		local vals = {ncalls, latency, latency, latency, latency}
 
-	dcube.insert(keys, grtable, vals, 1, true)
+		dcube.insert(keys, grtable, vals, 1, true)
+	end
 
 	return true
 end
