@@ -1426,7 +1426,7 @@ bool sinsp_chisel::run(sinsp_evt* evt)
 		{
 			throw sinsp_exception(m_filename + " chisel error: " + lua_tostring(m_ls, -1));
 		}
-	
+
 		int oeres = lua_toboolean(m_ls, -1);
 		lua_pop(m_ls, 1);
 
