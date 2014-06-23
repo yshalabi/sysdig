@@ -188,6 +188,8 @@ const struct ppm_event_info g_event_info[PPM_EVENT_MAX] = {
 	/* PPME_SYSCALL_MMAP2_X */{"mmap2", EC_MEMORY, EF_NONE, 4, {{"res", PT_UINT64, PF_HEX}, {"vm_size", PT_UINT32, PF_DEC}, {"vm_rss", PT_UINT32, PF_DEC}, {"vm_swap", PT_UINT32, PF_DEC} } },
 	/* PPME_SYSCALL_MUNMAP_E */{"munmap", EC_MEMORY, EF_NONE, 2, {{"addr", PT_UINT64, PF_HEX}, {"length", PT_UINT64, PF_DEC} } },
 	/* PPME_SYSCALL_MUNMAP_X */{"munmap", EC_MEMORY, EF_NONE, 4, {{"res", PT_ERRNO, PF_DEC}, {"vm_size", PT_UINT32, PF_DEC}, {"vm_rss", PT_UINT32, PF_DEC}, {"vm_swap", PT_UINT32, PF_DEC} } },
+	/* PPME_SYSCALL_SPLICE_E */{"splice", EC_IO_OTHER, EF_USES_FD, 4, {{"fd_in", PT_FD, PF_DEC}, {"fd_out", PT_FD, PF_DEC}, {"size", PT_UINT64, PF_DEC}, {"flags", PT_FLAGS32, PF_HEX, splice_flags} } },
+	/* PPME_SYSCALL_SPLICE_X */{"splice", EC_IO_OTHER, EF_USES_FD, 1, {{"res", PT_ERRNO, PF_DEC}} }
 	/* PPME_USER_E */{"appevt", EC_OTHER, EF_NONE, 3, {{"id", PT_UINT64, PF_DEC}, {"tags", PT_CHARBUFARRAY, PF_NA}, {"args", PT_CHARBUF_PAIR_ARRAY, PF_NA} } },
 	/* PPME_USER_X */{"appevt", EC_OTHER, EF_NONE, 2, {{"id", PT_UINT64, PF_DEC}, {"tags", PT_CHARBUFARRAY, PF_NA} } },
 };
