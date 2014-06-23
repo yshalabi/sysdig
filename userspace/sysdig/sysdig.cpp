@@ -139,9 +139,8 @@ static void usage()
 "Output format:\n\n"
 "By default, sysdig prints the information for each captured event on a single\n"
 " line with the following format:\n\n"
-" %%evt.num %%evt.time %%evt.cpu %%proc.name (%%thread.tid) %%evt.dir %%evt.type %%evt.args\n\n"
+"<evt.time> %%evt.cpu %%proc.name (%%thread.tid) %%evt.dir %%evt.type %%evt.args\n\n"
 "where:\n"
-" evt.num is the incremental event number\n"
 " evt.time is the event timestamp\n"
 " evt.cpu is the CPU number where the event was captured\n"
 " proc.name is the name of the process that generated the event\n"
@@ -415,6 +414,8 @@ captureinfo do_inspect(sinsp* inspector,
 	//
 	while(1)
 	{
+		inspector->profile_enter("\"loop\"");
+
 		if(retval.m_nevts == cnt || g_terminate)
 		{
 			//
@@ -435,7 +436,9 @@ captureinfo do_inspect(sinsp* inspector,
 			break;
 		}
 
+		inspector->profile_enter("\"loop\", \"next\"");
 		res = inspector->next(&ev);
+		inspector->profile_exit("\"loop\", \"next\"");
 
 		if(res == SCAP_TIMEOUT)
 		{
@@ -448,6 +451,7 @@ captureinfo do_inspect(sinsp* inspector,
 				chisels_do_timeout(ev);
 			}
 
+			inspector->profile_exit("\"loop\"");
 			continue;
 		}
 		else if(res == SCAP_EOF)
@@ -496,13 +500,16 @@ captureinfo do_inspect(sinsp* inspector,
 #ifdef HAS_CHISELS
 		if(!g_chisels.empty())
 		{
+			inspector->profile_enter("\"loop\", \"chisels\"");
 			for(vector<sinsp_chisel*>::iterator it = g_chisels.begin(); it != g_chisels.end(); ++it)
 			{
 				if((*it)->run(ev) == false)
 				{
+					inspector->profile_exit("\"loop\", \"chisels\"");
 					continue;
 				}
 			}
+			inspector->profile_exit("\"loop\", \"chisels\"");
 		}
 		else
 #endif
@@ -538,6 +545,7 @@ captureinfo do_inspect(sinsp* inspector,
 			//
 			if(quiet)
 			{
+				inspector->profile_exit("\"loop\"");
 				continue;
 			}
 
@@ -547,6 +555,7 @@ captureinfo do_inspect(sinsp* inspector,
 			//
 			if(ev->get_filter_flag() == sinsp_evt::FF_FILTER_DONT_DISPLAY)
 			{
+				inspector->profile_exit("\"loop\"");
 				continue;
 			}
 
@@ -560,6 +569,7 @@ captureinfo do_inspect(sinsp* inspector,
 					if(!display_filter->run(ev))
 					{
 						continue;
+						inspector->profile_exit("\"loop\"");
 					}
 				}
 
@@ -570,6 +580,8 @@ captureinfo do_inspect(sinsp* inspector,
 				}
 			}
 		}
+
+		inspector->profile_exit("\"loop\"");
 	}
 
 	retval.m_time = deltats;

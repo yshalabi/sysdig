@@ -77,6 +77,14 @@ sinsp::sinsp() :
 	m_isdebug_enabled = false;
 	m_filesize = -1;
 	m_track_appevts_state = false;
+
+#ifdef SINSP_PROFILE
+	m_profile_fp = fopen("/dev/sysdig-events", "w");
+	if(m_profile_fp == NULL)
+	{
+		throw sinsp_exception("can't open /dev/sysdig-events");
+	}
+#endif
 }
 
 sinsp::~sinsp()
@@ -99,6 +107,11 @@ sinsp::~sinsp()
 		delete m_thread_manager;
 		m_thread_manager = NULL;
 	}
+
+#ifdef SINSP_PROFILE
+	ASSERT(m_profile_fp != NULL);
+	fclose(m_profile_fp);
+#endif
 }
 
 void sinsp::init()
@@ -862,3 +875,4 @@ void sinsp::request_appevt_state_tracking()
 {
 	m_track_appevts_state = true;
 }
+

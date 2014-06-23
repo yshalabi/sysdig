@@ -480,6 +480,66 @@ public:
 
 	sinsp_parser* get_parser();
 
+#ifdef SINSP_PROFILE
+	inline void profile_enter(const char* tags, const char* args = NULL)
+	{
+		if(m_evt.m_evtnum % 100 != 0)
+		{
+			return;
+		}
+
+		if(tags == NULL)
+		{
+			tags = "";
+		}
+
+		if(args == NULL)
+		{
+			args = "";
+		}
+
+		m_last_profile_id = m_evt.m_evtnum;
+
+		fprintf(m_profile_fp, 
+			"[\">\", %" PRIu64 ", [\"sysdig\", %s], [%s]]",
+			m_last_profile_id,
+			tags,
+			args);
+
+		fflush(m_profile_fp);
+	}
+
+	inline void profile_exit(const char* tags)
+	{
+		if(m_evt.m_evtnum % 100 != 0)
+		{
+			return;
+		}
+
+		if(tags == NULL)
+		{
+			tags = "";
+		}
+
+		fprintf(m_profile_fp, 
+			"[\"<\", %" PRIu64 ", [\"sysdig\", %s], []]",
+			m_last_profile_id,
+			tags);
+
+		fflush(m_profile_fp);
+	}
+#else
+	inline void profile_enter(const char* tags, const char* args = NULL)
+	{
+		return;
+	}
+
+	inline void profile_exit(const char* tags)
+	{
+		return;
+	}
+#endif
+
 VISIBILITY_PRIVATE
 
 // Doxygen doesn't understand VISIBILITY_PRIVATE
@@ -566,6 +626,14 @@ private:
 	bool m_track_appevts_state;
 	list<sinsp_partial_appevt*> m_partial_appevts_list;
 	simple_lifo_queue<sinsp_partial_appevt>* m_partial_appevts_pool;
+
+	//
+	// Sinsp profiling
+	//
+#ifdef SINSP_PROFILE
+	FILE* m_profile_fp;
+	uint64_t m_last_profile_id;
+#endif
 
 	friend class sinsp_parser;
 	friend class sinsp_analyzer;
