@@ -481,11 +481,11 @@ public:
 	sinsp_parser* get_parser();
 
 #ifdef SINSP_PROFILE
-	inline void profile_enter(const char* tags, const char* args = NULL)
+	inline bool profile_enter(const char* tags, const char* args = NULL)
 	{
 		if(m_evt.m_evtnum % 100 != 0)
 		{
-			return;
+			return false;
 		}
 
 		if(tags == NULL)
@@ -507,15 +507,12 @@ public:
 			args);
 
 		fflush(m_profile_fp);
+
+		return true;
 	}
 
 	inline void profile_exit(const char* tags)
 	{
-		if(m_evt.m_evtnum % 100 != 0)
-		{
-			return;
-		}
-
 		if(tags == NULL)
 		{
 			tags = "";
@@ -529,9 +526,9 @@ public:
 		fflush(m_profile_fp);
 	}
 #else
-	inline void profile_enter(const char* tags, const char* args = NULL)
+	inline bool profile_enter(const char* tags, const char* args = NULL)
 	{
-		return;
+		return false;
 	}
 
 	inline void profile_exit(const char* tags)
@@ -652,3 +649,35 @@ private:
 };
 
 /*@}*/
+
+///////////////////////////////////////////////////////////////////////////////
+// Profiling support class
+///////////////////////////////////////////////////////////////////////////////
+class sinsp_profiler
+{
+public:
+	sinsp_profiler(sinsp* inspector, const char* tags, const char* args = NULL)
+	{
+		if(inspector->profile_enter(tags, args) == true)
+		{
+			m_inspector = inspector;
+			m_tags = tags;			
+		}
+		else
+		{
+			m_inspector = NULL;
+		}
+	}
+
+	~sinsp_profiler()
+	{
+		if(m_inspector)
+		{
+			m_inspector->profile_exit(m_tags.c_str());
+		}
+	}
+
+private:
+	sinsp* m_inspector;
+	string m_tags;
+};

@@ -414,7 +414,7 @@ captureinfo do_inspect(sinsp* inspector,
 	//
 	while(1)
 	{
-		inspector->profile_enter("\"loop\"");
+		sinsp_profiler p(inspector, "\"loop\"");
 
 		if(retval.m_nevts == cnt || g_terminate)
 		{
@@ -436,9 +436,10 @@ captureinfo do_inspect(sinsp* inspector,
 			break;
 		}
 
-		inspector->profile_enter("\"loop\", \"next\"");
-		res = inspector->next(&ev);
-		inspector->profile_exit("\"loop\", \"next\"");
+		{
+			sinsp_profiler pn(inspector, "\"loop\", \"next\"");
+			res = inspector->next(&ev);
+		}
 
 		if(res == SCAP_TIMEOUT)
 		{
@@ -451,7 +452,6 @@ captureinfo do_inspect(sinsp* inspector,
 				chisels_do_timeout(ev);
 			}
 
-			inspector->profile_exit("\"loop\"");
 			continue;
 		}
 		else if(res == SCAP_EOF)
@@ -500,16 +500,15 @@ captureinfo do_inspect(sinsp* inspector,
 #ifdef HAS_CHISELS
 		if(!g_chisels.empty())
 		{
-			inspector->profile_enter("\"loop\", \"chisels\"");
+			sinsp_profiler pc(inspector, "\"loop\", \"chisels\"");
+
 			for(vector<sinsp_chisel*>::iterator it = g_chisels.begin(); it != g_chisels.end(); ++it)
 			{
 				if((*it)->run(ev) == false)
 				{
-					inspector->profile_exit("\"loop\", \"chisels\"");
 					continue;
 				}
 			}
-			inspector->profile_exit("\"loop\", \"chisels\"");
 		}
 		else
 #endif
@@ -545,7 +544,6 @@ captureinfo do_inspect(sinsp* inspector,
 			//
 			if(quiet)
 			{
-				inspector->profile_exit("\"loop\"");
 				continue;
 			}
 
@@ -555,7 +553,6 @@ captureinfo do_inspect(sinsp* inspector,
 			//
 			if(ev->get_filter_flag() == sinsp_evt::FF_FILTER_DONT_DISPLAY)
 			{
-				inspector->profile_exit("\"loop\"");
 				continue;
 			}
 
@@ -569,7 +566,6 @@ captureinfo do_inspect(sinsp* inspector,
 					if(!display_filter->run(ev))
 					{
 						continue;
-						inspector->profile_exit("\"loop\"");
 					}
 				}
 
@@ -580,8 +576,6 @@ captureinfo do_inspect(sinsp* inspector,
 				}
 			}
 		}
-
-		inspector->profile_exit("\"loop\"");
 	}
 
 	retval.m_time = deltats;
