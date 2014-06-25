@@ -2021,7 +2021,7 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 	//
 	// User events get into the engine as normal writes, but the FD has a flag to
 	// quickly recognize them.
-	//
+	//	
 	if(retval == -PPM_USERVET_MAGIC)
 	{
 		//

@@ -481,11 +481,11 @@ public:
 	sinsp_parser* get_parser();
 
 #ifdef SINSP_PROFILE
-	inline bool profile_enter(const char* tags, const char* args = NULL)
+	inline int64_t profile_enter(const char* tags, const char* args = NULL)
 	{
-		if(m_evt.m_evtnum % 100 != 0)
+		if(m_islive == true || m_evt.m_evtnum % SINSP_PROFILE_SUBSAMPLING_RATIO != 0)
 		{
-			return false;
+			return -1;
 		}
 
 		if(tags == NULL)
@@ -498,20 +498,18 @@ public:
 			args = "";
 		}
 
-		m_last_profile_id = m_evt.m_evtnum;
-
 		fprintf(m_profile_fp, 
 			"[\">\", %" PRIu64 ", [\"sysdig\", %s], [%s]]",
-			m_last_profile_id,
+			m_evt.m_evtnum,
 			tags,
 			args);
 
 		fflush(m_profile_fp);
 
-		return true;
+		return (int64_t)m_evt.m_evtnum;
 	}
 
-	inline void profile_exit(const char* tags)
+	inline void profile_exit(int64_t id, const char* tags)
 	{
 		if(tags == NULL)
 		{
@@ -520,18 +518,18 @@ public:
 
 		fprintf(m_profile_fp, 
 			"[\"<\", %" PRIu64 ", [\"sysdig\", %s], []]",
-			m_last_profile_id,
+			id,
 			tags);
 
 		fflush(m_profile_fp);
 	}
 #else
-	inline bool profile_enter(const char* tags, const char* args = NULL)
+	inline int64_t profile_enter(const char* tags, const char* args = NULL)
 	{
-		return false;
+		return -1;
 	}
 
-	inline void profile_exit(const char* tags)
+	inline void profile_exit(int64_t id, const char* tags)
 	{
 		return;
 	}
@@ -629,7 +627,6 @@ private:
 	//
 #ifdef SINSP_PROFILE
 	FILE* m_profile_fp;
-	uint64_t m_last_profile_id;
 #endif
 
 	friend class sinsp_parser;
@@ -658,7 +655,9 @@ class sinsp_profiler
 public:
 	sinsp_profiler(sinsp* inspector, const char* tags, const char* args = NULL)
 	{
-		if(inspector->profile_enter(tags, args) == true)
+		m_id = inspector->profile_enter(tags, args);
+
+		if(m_id != -1)
 		{
 			m_inspector = inspector;
 			m_tags = tags;			
@@ -671,13 +670,14 @@ public:
 
 	~sinsp_profiler()
 	{
-		if(m_inspector)
+		if(m_id != -1)
 		{
-			m_inspector->profile_exit(m_tags.c_str());
+			m_inspector->profile_exit(m_id, m_tags.c_str());
 		}
 	}
 
 private:
 	sinsp* m_inspector;
 	string m_tags;
+	int64_t m_id;
 };

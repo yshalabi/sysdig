@@ -36,6 +36,7 @@ along with sysdig.  If not, see <http://www.gnu.org/licenses/>.
 #else
 #include <unistd.h>
 #include <getopt.h>
+#include <sys/time.h>
 #endif
 
 static bool g_terminate = false;
@@ -414,7 +415,7 @@ captureinfo do_inspect(sinsp* inspector,
 	//
 	while(1)
 	{
-		sinsp_profiler p(inspector, "\"loop\"");
+//		sinsp_profiler p(inspector, "\"loop\"");
 
 		if(retval.m_nevts == cnt || g_terminate)
 		{
@@ -437,7 +438,7 @@ captureinfo do_inspect(sinsp* inspector,
 		}
 
 		{
-			sinsp_profiler pn(inspector, "\"loop\", \"next\"");
+//			sinsp_profiler pn(inspector, "\"loop\", \"next\"");
 			res = inspector->next(&ev);
 		}
 
@@ -500,7 +501,7 @@ captureinfo do_inspect(sinsp* inspector,
 #ifdef HAS_CHISELS
 		if(!g_chisels.empty())
 		{
-			sinsp_profiler pc(inspector, "\"loop\", \"chisels\"");
+			//sinsp_profiler pc(inspector, "\"loop\", \"chisels\"");
 
 			for(vector<sinsp_chisel*>::iterator it = g_chisels.begin(); it != g_chisels.end(); ++it)
 			{
@@ -542,6 +543,7 @@ captureinfo do_inspect(sinsp* inspector,
 			// When the quiet flag is specified, we don't do any kind of processing other
 			// than counting the events.
 			//
+			//sinsp_profiler po(inspector, "\"loop\", \"other\"");
 			if(quiet)
 			{
 				continue;
@@ -602,7 +604,8 @@ int main(int argc, char **argv)
 	bool compress = false;
 	sinsp_evt::param_fmt event_buffer_format = sinsp_evt::PF_NORMAL;
 	sinsp_filter* display_filter = NULL;
-	double duration = 1;
+	timeval start_time, end_time;
+	double duration;
 	captureinfo cinfo;
 	string output_format;
 	uint32_t snaplen = 0;
@@ -1035,7 +1038,7 @@ int main(int argc, char **argv)
 				inspector->set_snaplen(snaplen);
 			}
 
-			duration = ((double)clock()) / CLOCKS_PER_SEC;
+			gettimeofday(&start_time, NULL);
 
 			if(outfile != "")
 			{
@@ -1056,7 +1059,7 @@ int main(int argc, char **argv)
 				summary_table,
 				&formatter);
 
-			duration = ((double)clock()) / CLOCKS_PER_SEC - duration;
+			gettimeofday(&end_time, NULL);
 
 			scap_stats cstats;
 			inspector->get_capture_stats(&cstats);
@@ -1066,6 +1069,9 @@ int main(int argc, char **argv)
 				fprintf(stderr, "Driver Events:%" PRIu64 "\nDriver Drops:%" PRIu64 "\n",
 					cstats.n_evts,
 					cstats.n_drops);
+
+				duration = (end_time.tv_sec - start_time.tv_sec);
+				duration += (end_time.tv_usec - start_time.tv_usec) / 1000000.0;
 
 				fprintf(stderr, "Elapsed time: %.3lf, Captured Events: %" PRIu64 ", %.2lf eps\n",
 					duration,
