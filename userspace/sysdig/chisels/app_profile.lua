@@ -33,7 +33,6 @@ fkeys = {}
 fntags = nil
 run_cnt = 0
 flatency = nil
-fncalls = nil
 
 vizinfo = 
 {
@@ -67,7 +66,6 @@ function on_init()
 	end
 
 	flatency = chisel.request_field("appevt.latency")
-	fncalls = chisel.request_field("evt.count")
 
 	-- Init the datacube
 	dcube.set_viz_info(vizinfo)
@@ -101,11 +99,9 @@ function on_event()
 	end
 
 	local latency = evt.field(flatency)
-	local ncalls = evt.field(fncalls)
 
 	if latency ~= nil then
-		local vals = {ncalls, latency, latency, latency, latency}
-
+		local vals = {1, latency, latency, latency, latency}
 		dcube.insert(keys, grtable, vals, 1, true)
 	end
 
@@ -117,7 +113,6 @@ function on_interval(ts_s, ts_ns, delta)
 		terminal.clearscreen()
 		terminal.moveto(0, 0)
 	end
-	
 	dcube.print(grtable, ts_s, 0, delta)
 
 	-- Clear the table

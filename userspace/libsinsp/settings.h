@@ -19,8 +19,10 @@ along with sysdig.  If not, see <http://www.gnu.org/licenses/>.
 //
 // Define this to enable profiling
 //
+#ifndef _WIN32
 #define SINSP_PROFILE
 #define SINSP_PROFILE_SUBSAMPLING_RATIO 100
+#endif
 
 //
 // This flag can be used to include unsupported or unrecognized sockets

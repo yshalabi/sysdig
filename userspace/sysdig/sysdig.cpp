@@ -33,6 +33,7 @@ along with sysdig.  If not, see <http://www.gnu.org/licenses/>.
 #ifdef _WIN32
 #include "win32/getopt.h"
 #include <io.h>
+SINSP_PUBLIC int gettimeofday(struct timeval *tv, struct timezone2 *tz);
 #else
 #include <unistd.h>
 #include <getopt.h>
