@@ -239,6 +239,19 @@ public:
 			sinsp_partial_appevt* pae = m_inspector->m_partial_appevts_pool->pop();
 			if(pae == NULL)
 			{
+				//
+				// The list is completely used. This likely means that there have been drops and 
+				// the entries will be stuck there forever. Better clean the list, miss the 128
+				// events it contains, and start fresh.
+				//
+				list<sinsp_partial_appevt*>* partial_appevts_list = &m_inspector->m_partial_appevts_list;
+				list<sinsp_partial_appevt*>::iterator it;
+				for(it = partial_appevts_list->begin(); it != partial_appevts_list->end(); ++it)
+				{
+					m_inspector->m_partial_appevts_pool->push(*it);
+				}
+				partial_appevts_list->clear();
+
 				return sinsp_appevtparser::RES_OK;
 			}
 
