@@ -417,6 +417,12 @@ void handle_end_of_file(bool print_progress)
 	}
 }
 
+void generate_sysdig_event(FILE* f, char* text)
+{
+	fwrite(text, strlen(text), 1, f);
+	fflush(f);
+}
+
 //
 // Event processing loop
 //
@@ -437,6 +443,15 @@ captureinfo do_inspect(sinsp* inspector,
 	uint64_t firstts = 0;
 	string line;
 	double last_printed_progress_pct = 0;
+
+FILE* f = fopen("/dev/sysdig-events", "w");
+for(uint32_t j = 0; j < 1000000; j++)
+{
+	sinsp_profiler p(inspector, "\"loop\"");
+//	generate_sysdig_event(f, (char *)"[\">\", 1, [\"lorisapp\", \"loop\"], []]");
+//	generate_sysdig_event(f, (char *)"[\"<\", 1, [\"lorisapp\", \"loop\"], []]");		
+}
+return retval;
 
 	//
 	// Loop through the events
@@ -1114,8 +1129,6 @@ int main(int argc, char **argv)
 				inspector->set_snaplen(snaplen);
 			}
 
-			gettimeofday(&start_time, NULL);
-
 			if(outfile != "")
 			{
 
@@ -1127,6 +1140,8 @@ int main(int argc, char **argv)
 			// Notify the chisels that the capture is starting
 			//
 			chisels_on_capture_start();
+
+			gettimeofday(&start_time, NULL);
 
 			cinfo = do_inspect(inspector,
 				cnt,

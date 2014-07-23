@@ -487,7 +487,7 @@ public:
 	sinsp_parser* get_parser();
 
 #ifdef SINSP_PROFILE
-	inline int64_t profile_enter(const char* tags, const char* args = NULL)
+	inline int64_t profile_enter(const char* tags, uint32_t tags_size, const char* args = NULL, uint32_t args_size = 0)
 	{
 		if(m_islive == true || m_evt.m_evtnum % SINSP_PROFILE_SUBSAMPLING_RATIO != 0)
 		{
@@ -530,12 +530,12 @@ public:
 		fflush(m_profile_fp);
 	}
 #else
-	inline int64_t profile_enter(const char* tags, const char* args = NULL)
+	inline int64_t profile_enter(sinsp* inspector, const char* tags, uint32_t tags_size, const char* args = NULL, uint32_t args_size = 0)
 	{
 		return -1;
 	}
 
-	inline void profile_exit(int64_t id, const char* tags)
+	inline void profile_exit(int64_t id, const char* tags, uint32_t tags_size)
 	{
 		return;
 	}
@@ -667,7 +667,7 @@ private:
 class sinsp_profiler
 {
 public:
-	sinsp_profiler(sinsp* inspector, const char* tags, const char* args = NULL)
+	sinsp_profiler(sinsp* inspector, const char* tags, uint32_t tags_size, const char* args = NULL, uint32_t args_size = 0)
 	{
 		m_id = inspector->profile_enter(tags, args);
 
@@ -686,7 +686,7 @@ public:
 	{
 		if(m_id != -1)
 		{
-			m_inspector->profile_exit(m_id, m_tags.c_str());
+			m_inspector->profile_exit(m_id, m_tags.c_str(), uint32_t tags_size);
 		}
 	}
 
