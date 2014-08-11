@@ -93,7 +93,7 @@ public:
 	// Extract the field as json from the event (by default, fall
 	// back to the regular extract functionality)
 	//
-	Json::Value extract_as_js(sinsp_evt *evt, OUT uint32_t* len)
+	virtual Json::Value extract_as_js(sinsp_evt *evt, OUT uint32_t* len)
 	{
 		return Json::Value::null;
 	}
@@ -253,12 +253,9 @@ public:
 	sinsp_filter_check* allocate_new();
 	int32_t parse_field_name(const char* str);
 	uint8_t* extract(sinsp_evt *evt, OUT uint32_t* len);
-	uint8_t* extract_fdtype(sinsp_fdinfo_t* fdinfo);
 	bool compare_ip(sinsp_evt *evt);
 	bool compare_port(sinsp_evt *evt);
 	bool compare(sinsp_evt *evt);
-	char* tostring(sinsp_evt* evt);
-	Json::Value tojson(sinsp_evt* evt);
 
 	sinsp_threadinfo* m_tinfo;
 	sinsp_fdinfo_t* m_fdinfo;
@@ -359,23 +356,26 @@ public:
 		TYPE_ARGS = 16,
 		TYPE_ARGSTR = 17,
 		TYPE_ARGRAW = 18,
-		TYPE_BUFFER = 19,
-		TYPE_RESSTR = 20,
-		TYPE_RESRAW = 21,
-		TYPE_FAILED = 22,
-		TYPE_ISIO = 23,
-		TYPE_ISIO_READ = 24,
-		TYPE_ISIO_WRITE = 25,
-		TYPE_IODIR = 26,
-		TYPE_ISWAIT = 27,
-		TYPE_COUNT = 28,
-		TYPE_APPEVT_ID = 29,
-		TYPE_APPEVT_NTAGS = 30,
-		TYPE_APPEVT_NARGS = 31,
-		TYPE_APPEVT_TAGS = 32,
-		TYPE_APPEVT_TAG = 33,
-		TYPE_APPEVT_ARGS = 34,
-		TYPE_APPEVT_ARG = 35,
+		TYPE_INFO = 19,
+		TYPE_BUFFER = 20,
+		TYPE_RESSTR = 21,
+		TYPE_RESRAW = 22,
+		TYPE_FAILED = 23,
+		TYPE_ISIO = 24,
+		TYPE_ISIO_READ = 25,
+		TYPE_ISIO_WRITE = 26,
+		TYPE_IODIR = 27,
+		TYPE_ISWAIT = 28,
+		TYPE_ISSYSLOG = 29,
+		TYPE_COUNT = 30,
+		TYPE_AROUND = 31,
+		TYPE_APPEVT_ID = 32,
+		TYPE_APPEVT_NTAGS = 33,
+		TYPE_APPEVT_NARGS = 34,
+		TYPE_APPEVT_TAGS = 35,
+		TYPE_APPEVT_TAG = 36,
+		TYPE_APPEVT_ARGS = 37,
+		TYPE_APPEVT_ARG = 38,
 	};
 
 	sinsp_filter_check_event();
@@ -386,11 +386,10 @@ public:
 	uint8_t* extract(sinsp_evt *evt, OUT uint32_t* len);
 	Json::Value extract_as_js(sinsp_evt *evt, OUT uint32_t* len);
 	bool compare(sinsp_evt *evt);
-	char* tostring(sinsp_evt* evt);
-	Json::Value tojson(sinsp_evt* evt);
 
 	uint64_t m_first_ts;
 	uint64_t m_u64val;
+	uint64_t m_tsdelta;
 	uint32_t m_u32val;
 	string m_strstorage;
 	string m_argname;
@@ -515,4 +514,30 @@ public:
 	uint32_t m_text_len;
 };
 
+//
+// syslog checks
+//
+class sinsp_decoder_syslog;
+
+class sinsp_filter_check_syslog : public sinsp_filter_check
+{
+public:
+	enum check_type
+	{
+		TYPE_FACILITY_STR = 0,
+		TYPE_FACILITY,
+		TYPE_SEVERITY_STR,
+		TYPE_SEVERITY,
+		TYPE_MESSAGE,
+	};
+
+	sinsp_filter_check_syslog();
+	sinsp_filter_check* allocate_new();
+	int32_t parse_field_name(const char* str);
+	uint8_t* extract(sinsp_evt *evt, OUT uint32_t* len);
+
+	sinsp_decoder_syslog* m_decoder;
+	uint32_t m_gid;
+	string m_name;
+};
 #endif // HAS_FILTERING

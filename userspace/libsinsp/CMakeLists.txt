@@ -6,6 +6,7 @@ include_directories("${LUAJIT_INCLUDE}")
 
 add_library(sinsp STATIC
 	chisel.cpp
+	chisel_api.cpp
 	cyclewriter.cpp
 	event.cpp
 	eventformatter.cpp
@@ -19,6 +20,7 @@ add_library(sinsp STATIC
 	"${JSONCPP_LIB_SRC}"
 	logger.cpp
 	parsers.cpp
+	protodecoder.cpp
 	threadinfo.cpp
 	sinsp.cpp
 	stats.cpp

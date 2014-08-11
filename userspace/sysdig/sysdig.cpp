@@ -45,6 +45,13 @@ static bool g_terminate = false;
 vector<sinsp_chisel*> g_chisels;
 #endif
 
+
+
+// Sysdig 0.1.85 had log-rotation options (-C,-G,-W), but they were problematic,
+// so I'm disabling them until they can be fixed
+#define DISABLE_CGW
+
+
 static void usage();
 
 //
@@ -83,7 +90,6 @@ static void usage()
 " -A, --print-ascii  Only print the text portion of data buffers, and echo\n"
 "                    end-of-lines. This is useful to only display human-readable\n"
 "                    data.\n"
-" -a, --abstime      Show absolute event timestamps\n"
 #ifdef HAS_CHISELS
 " -c <chiselname> <chiselargs>, --chisel  <chiselname> <chiselargs>\n"
 "                    run the specified chisel. If the chisel require arguments,\n"
@@ -92,19 +98,34 @@ static void usage()
 "                    lists the available chisels. Looks for chisels in .,\n"
 "                    ./chisels, ~/.chisels and /usr/share/sysdig/chisels.\n"
 #endif
+#ifndef DISABLE_CGW
 " -C <file_size>, --file-size=<file_size>\n"
-"                    Before writing a raw packet, check whether the file is\n"
+"                    Before writing an event, check whether the file is\n"
 "                    currently larger than file_size and, if so, close the\n"
 "                    current file and open a new one. Savefiles will have the\n"
 "                    name specified with the -w flag, with a number after it,\n"
 "                    starting at 0 and continuing upward. The units of file_size\n"
-"                    are millions of bytes (10^6, not 2^20)\n"
-" -d, --displayflt   Make the given filter a display one.\n"
+"                    are millions of bytes (10^6, not 2^20). Use the -W flag to\n"
+"                    determine how many files will be saved to disk.\n"
+#endif
+" -d, --displayflt   Make the given filter a display one\n"
 "                    Setting this option causes the events to be filtered\n"
 "                    after being parsed by the state system. Events are\n"
 "                    normally filtered before being analyzed, which is more\n"
 "                    efficient, but can cause state (e.g. FD names) to be lost.\n"
 " -D, --debug        Capture events about sysdig itself\n"
+" -F, --fatfile	     Enable fatfile mode\n"
+"                    when writing in fatfile mode, the output file will contain\n"
+"                    events that will be invisible when reading the file, but\n"
+"                    that are necessary to fully reconstruct the state.\n"
+"                    Fatfile mode is useful when saving events to disk with an\n"
+"                    aggressive filter. The filter could drop events that would\n"
+"                    the state to be updated (e.g. clone() or open()). With\n"
+"                    fatfile mode, those events are still saved to file, but\n"
+"                    'hidden' so that they won't appear when reading the file.\n"
+"                    Be aware that using this flag might generate substantially\n"
+"                    bigger traces files.\n"
+#ifndef DISABLE_CGW
 " -G <num_seconds>, --seconds=<num_seconds>\n"
 "                    Rotates the dump file specified with the -w option every\n"
 "                    num_seconds seconds. Savefiles will have the name specified\n"
@@ -114,6 +135,7 @@ static void usage()
 "\n"
 "                    If used in conjunction with the -C option, filenames will take\n"
 "                    the form of `file<count>'.\n"
+#endif
 " -h, --help         Print this page\n"
 #ifdef HAS_CHISELS
 " -i <chiselname>, --chisel-info <chiselname>\n"
@@ -131,7 +153,7 @@ static void usage()
 " -p <output_format>, --print=<output_format>\n"
 "                    Specify the format to be used when printing the events.\n"
 "                    See the examples section below for more info.\n"
-" -q, --quiet        Don't print events on the screen.\n"
+" -q, --quiet        Don't print events on the screen\n"
 "                    Useful when dumping to disk.\n"
 " -r <readfile>, --read=<readfile>\n"
 "                    Read the events from <readfile>.\n"
@@ -149,6 +171,7 @@ static void usage()
 " -v, --verbose      Verbose output.\n"
 " -w <writefile>, --write=<writefile>\n"
 "                    Write the captured events to <writefile>.\n"
+#ifndef DISABLE_CGW
 " -W <num>, --limit <num>\n"
 "                    Used in conjunction with the -C option, this will limit the number\n"
 "                    of files created to the specified number, and begin overwriting files\n"
@@ -160,6 +183,7 @@ static void usage()
 "                    of rotated dump files that get created, exiting with status 0 when\n"
 "                    reaching the limit. If used with -C as well, the behavior will result\n"
 "                    in cyclical files per timeslice.\n"
+#endif
 " -x, --print-hex    Print data buffers in hex.\n"
 " -X, --print-hex-ascii\n"
 "                    Print data buffers in hex and ASCII.\n"
@@ -323,14 +347,22 @@ static void parse_chisel_args(sinsp_chisel* ch, sinsp* inspector, int optind, in
 						}
 					}
 
-					try
-					{
-						sinsp_filter df(inspector, testflt);
-					}
-					catch(...)
+					if(nargs == 1 && ch->get_lua_script_info()->m_args[0].m_type == "filter")
 					{
 						ch->set_args(args);
 						(*n_filterargs)++;
+					}
+					else
+					{
+						try
+						{
+							sinsp_filter df(inspector, testflt);
+						}
+						catch(...)
+						{
+							ch->set_args(args);
+							(*n_filterargs)++;
+						}
 					}
 				}
 			}
@@ -353,6 +385,8 @@ static void free_chisels()
 	{
 		delete *it;
 	}
+
+	g_chisels.clear();
 #endif
 }
 
@@ -388,8 +422,18 @@ static void chisels_do_timeout(sinsp_evt* ev)
 #endif
 }
 
-void handle_end_of_file(bool print_progress)
+void handle_end_of_file(bool print_progress, sinsp_evt_formatter* formatter = NULL)
 {
+	string line;
+
+	// Notify the formatter that we are at the
+	// end of the capture in case it needs to
+	// write any terminating characters
+	if(formatter != NULL && formatter->on_capture_end(&line))
+	{
+		cout << line << endl;
+	}
+
 	//
 	// Reached the end of a trace file.
 	// If we are reporting prgress, this is 100%
@@ -417,19 +461,12 @@ void handle_end_of_file(bool print_progress)
 	}
 }
 
-void generate_sysdig_event(FILE* f, char* text)
-{
-	fwrite(text, strlen(text), 1, f);
-	fflush(f);
-}
-
 //
 // Event processing loop
 //
 captureinfo do_inspect(sinsp* inspector,
 					   uint64_t cnt,
 					   bool quiet,
-					   bool absolute_times,
 					   bool print_progress,
 					   sinsp_filter* display_filter,
 					   vector<summary_table_entry>* summary_table,
@@ -444,15 +481,6 @@ captureinfo do_inspect(sinsp* inspector,
 	string line;
 	double last_printed_progress_pct = 0;
 
-FILE* f = fopen("/dev/sysdig-events", "w");
-for(uint32_t j = 0; j < 1000000; j++)
-{
-	sinsp_profiler p(inspector, "\"loop\"");
-//	generate_sysdig_event(f, (char *)"[\">\", 1, [\"lorisapp\", \"loop\"], []]");
-//	generate_sysdig_event(f, (char *)"[\"<\", 1, [\"lorisapp\", \"loop\"], []]");		
-}
-return retval;
-
 	//
 	// Loop through the events
 	//
@@ -465,18 +493,8 @@ return retval;
 			//
 			// End of capture, either because the user stopped it, or because
 			// we reached the event count specified with -n.
-			// Notify the chisels that we're exiting.
 			//
-			chisels_on_capture_end();
-
-			// Notify the formatter that we are at the 
-			// end of the capture in case it needs to 
-			// write any terminating characters
-			if(formatter->on_capture_end(&line))
-			{
-				cout << line << endl;
-			}
-
+			handle_end_of_file(print_progress, formatter);
 			break;
 		}
 
@@ -500,7 +518,7 @@ return retval;
 		}
 		else if(res == SCAP_EOF)
 		{
-			handle_end_of_file(print_progress);
+			handle_end_of_file(print_progress, formatter);
 			break;
 		}
 		else if(res != SCAP_SUCCESS)
@@ -509,7 +527,7 @@ return retval;
 			// Event read error.
 			// Notify the chisels that we're exiting, and then die with an error.
 			//
-			handle_end_of_file(print_progress);
+			handle_end_of_file(print_progress, formatter);
 			cerr << "res = " << res << endl;
 			throw sinsp_exception(inspector->getlasterr().c_str());
 		}
@@ -619,6 +637,10 @@ return retval;
 				{
 					cout << endl;
 				}
+				else
+				{
+					cout << flush;
+				}
 			}
 		}
 	}
@@ -628,18 +650,17 @@ return retval;
 }
 
 //
-// MAIN
+// ARGUMENT PARSING AND PROGRAM SETUP
 //
-int main(int argc, char **argv)
+sysdig_init_res sysdig_init(int argc, char **argv)
 {
-	int res = EXIT_SUCCESS;
+	sysdig_init_res res;
 	sinsp* inspector = NULL;
 	vector<string> infiles;
 	string outfile;
 	int op;
 	uint64_t cnt = -1;
 	bool quiet = false;
-	bool absolute_times = false;
 	bool is_filter_display = false;
 	bool verbose = false;
 	bool list_flds = false;
@@ -668,7 +689,6 @@ int main(int argc, char **argv)
 	static struct option long_options[] =
 	{
 		{"print-ascii", no_argument, 0, 'A' },
-		{"abstimes", no_argument, 0, 'a' },
 #ifdef HAS_CHISELS
 		{"chisel", required_argument, 0, 'c' },
 		{"list-chisels", no_argument, &cflag, 1 },
@@ -676,12 +696,17 @@ int main(int argc, char **argv)
 		{"compress", no_argument, 0, 'z' },
 		{"displayflt", no_argument, 0, 'd' },
 		{"debug", no_argument, 0, 'D'},
+		{"fatfile", no_argument, 0, 'F'},
+#ifndef DISABLE_CGW
 		{"seconds", required_argument, 0, 'G' },
+#endif
 		{"help", no_argument, 0, 'h' },
 #ifdef HAS_CHISELS
 		{"chisel-info", required_argument, 0, 'i' },
 #endif
+#ifndef DISABLE_CGW
 		{"file-size", required_argument, 0, 'C' },
+#endif
 		{"json", no_argument, 0, 'j' },
 		{"list", no_argument, 0, 'l' },
 		{"list-events", no_argument, 0, 'L' },
@@ -695,13 +720,15 @@ int main(int argc, char **argv)
 		{"timetype", required_argument, 0, 't' },
 		{"verbose", no_argument, 0, 'v' },
 		{"writefile", required_argument, 0, 'w' },
+#ifndef DISABLE_CGW
 		{"limit", required_argument, 0, 'W' },
+#endif
 		{"print-hex", no_argument, 0, 'x'},
 		{"print-hex-ascii", no_argument, 0, 'X'},
 		{0, 0, 0, 0}
 	};
 
-	output_format = "*%evt.num <TIME> %evt.cpu %proc.name (%thread.tid) %evt.dir %evt.type %evt.args";
+	output_format = "*%evt.num <TIME> %evt.cpu %proc.name (%thread.tid) %evt.dir %evt.type %evt.info";
 //	output_format = DEFAULT_OUTPUT_STR;
 
 	try
@@ -715,7 +742,20 @@ int main(int argc, char **argv)
 		//
 		// Parse the args
 		//
-		while((op = getopt_long(argc, argv, "Aac:C:dDG:hi:jlLn:Pp:qr:Ss:t:vW:w:xXz", long_options, &long_index)) != -1)
+		while((op = getopt_long(argc, argv,
+                                        "Ac:"
+#ifndef DISABLE_CGW
+                                        "C:"
+#endif
+                                        "dDF"
+#ifndef DISABLE_CGW
+                                        "G:"
+#endif
+                                        "hi:jlLn:Pp:qr:Ss:t:v"
+#ifndef DISABLE_CGW
+                                        "W:"
+#endif
+                                        "w:xXz", long_options, &long_index)) != -1)
 		{
 			switch(op)
 			{
@@ -724,13 +764,10 @@ int main(int argc, char **argv)
 				{
 					fprintf(stderr, "you cannot specify more than one output format\n");
 					delete inspector;
-					return EXIT_SUCCESS;
+					return sysdig_init_res(EXIT_SUCCESS);
 				}
 
 				event_buffer_format = sinsp_evt::PF_EOLS;
-				break;
-			case 'a':
-				absolute_times = true;
 				break;
 			case 0:
 				if(cflag != 1 && cflag != 2)
@@ -764,7 +801,7 @@ int main(int argc, char **argv)
 						sinsp_chisel::get_chisel_list(&chlist);
 						list_chisels(&chlist, true);
 						delete inspector;
-						return EXIT_SUCCESS;
+						return sysdig_init_res(EXIT_SUCCESS);
 					}
 
 					sinsp_chisel* ch = new sinsp_chisel(inspector, optarg);
@@ -774,34 +811,40 @@ int main(int argc, char **argv)
 #endif
 				break;
 
+#ifndef DISABLE_CGW
 			// File-size
 			case 'C':
 				rollover_mb = atoi(optarg);
 				if(rollover_mb <= 0)
 				{
 					throw sinsp_exception(string("invalid file size") + optarg);
-					res = EXIT_FAILURE;
+					res.m_res = EXIT_FAILURE;
 					goto exit;
 				}
 
 				// -C always implicates a cycle
 				do_cycle = true;
 				break;
+#endif
 
 			case 'D':
 				inspector->set_debug_mode(true);
 				break;
-
+			case 'F':
+				inspector->set_fatfile_dump_mode(true);
+				break;
+#ifndef DISABLE_CGW
 			// Number of seconds between roll-over
 			case 'G':
 				duration_seconds = atoi(optarg);
 				if(duration_seconds <= 0)
 				{
 					throw sinsp_exception(string("invalid duration") + optarg);
-					res = EXIT_FAILURE;
+					res.m_res = EXIT_FAILURE;
 					goto exit;
 				}
 				break;
+#endif
 
 #ifdef HAS_CHISELS
 			// --chisel-info and -i
@@ -819,7 +862,7 @@ int main(int argc, char **argv)
 						{
 							print_chisel_info(&chlist[j]);
 							delete inspector;
-							return EXIT_SUCCESS;
+							return sysdig_init_res(EXIT_SUCCESS);
 						}
 					}
 
@@ -832,13 +875,11 @@ int main(int argc, char **argv)
 				is_filter_display = true;
 				break;
 			case 'j':
-//				throw sinsp_exception("json output not yet implemented");
-
 				if(event_buffer_format != sinsp_evt::PF_NORMAL)
 				{
 					fprintf(stderr, "you cannot specify more than one output format\n");
 					delete inspector;
-					return EXIT_SUCCESS;
+					return sysdig_init_res(EXIT_SUCCESS);
 				}
 
 				event_buffer_format = sinsp_evt::PF_JSON;
@@ -846,20 +887,20 @@ int main(int argc, char **argv)
 			case 'h':
 				usage();
 				delete inspector;
-				return EXIT_SUCCESS;
+				return sysdig_init_res(EXIT_SUCCESS);
 			case 'l':
 				list_flds = true;
 				break;
 			case 'L':
 				list_events(inspector);
 				delete inspector;
-				return EXIT_SUCCESS;
+				return sysdig_init_res(EXIT_SUCCESS);
 			case 'n':
 				cnt = atoi(optarg);
 				if(cnt <= 0)
 				{
-					throw sinsp_exception(string("invalid packet count ") + optarg);
-					res = EXIT_FAILURE;
+					throw sinsp_exception(string("invalid event count ") + optarg);
+					res.m_res = EXIT_FAILURE;
 					goto exit;
 				}
 				break;
@@ -875,7 +916,7 @@ int main(int argc, char **argv)
 					replace_in_place(output_format, "<TIME>", timefmt);
 					printf("%s\n", output_format.c_str());
 					delete inspector;
-					return EXIT_SUCCESS;
+					return sysdig_init_res(EXIT_SUCCESS);
 				}
 				else
 				{
@@ -936,23 +977,25 @@ int main(int argc, char **argv)
 				quiet = true;
 				break;
 
+#ifndef DISABLE_CGW
 			// Number of capture files to cycle through
 			case 'W':
 				file_limit = atoi(optarg);
 				if(file_limit <= 0)
 				{
 					throw sinsp_exception(string("invalid file limit") + optarg);
-					res = EXIT_FAILURE;
+					res.m_res = EXIT_FAILURE;
 					goto exit;
 				}
 				break;
+#endif
 
 			case 'x':
 				if(event_buffer_format != sinsp_evt::PF_NORMAL)
 				{
 					fprintf(stderr, "you cannot specify more than one output format\n");
 					delete inspector;
-					return EXIT_SUCCESS;
+					return sysdig_init_res(EXIT_SUCCESS);
 				}
 
 				event_buffer_format = sinsp_evt::PF_HEX;
@@ -962,7 +1005,7 @@ int main(int argc, char **argv)
 				{
 					fprintf(stderr, "you cannot specify more than one output format\n");
 					delete inspector;
-					return EXIT_SUCCESS;
+					return sysdig_init_res(EXIT_SUCCESS);
 				}
 
 				event_buffer_format = sinsp_evt::PF_HEXASCII;
@@ -995,7 +1038,7 @@ int main(int argc, char **argv)
 				list_fields(false);
 			}
 
-			res = EXIT_SUCCESS;
+			res.m_res = EXIT_SUCCESS;
 			goto exit;
 		}
 
@@ -1022,7 +1065,7 @@ int main(int argc, char **argv)
 			}
 #else
 			fprintf(stderr, "filtering not compiled.\n");
-			res = EXIT_FAILURE;
+			res.m_res = EXIT_FAILURE;
 			goto exit;
 #endif
 		}
@@ -1030,14 +1073,14 @@ int main(int argc, char **argv)
 		if(signal(SIGINT, signal_callback) == SIG_ERR)
 		{
 			fprintf(stderr, "An error occurred while setting SIGINT signal handler.\n");
-			res = EXIT_FAILURE;
+			res.m_res = EXIT_FAILURE;
 			goto exit;
 		}
 
 		if(signal(SIGTERM, signal_callback) == SIG_ERR)
 		{
 			fprintf(stderr, "An error occurred while setting SIGTERM signal handler.\n");
-			res = EXIT_FAILURE;
+			res.m_res = EXIT_FAILURE;
 			goto exit;
 		}
 
@@ -1090,7 +1133,7 @@ int main(int argc, char **argv)
 				if(print_progress)
 				{
 					fprintf(stderr, "the -P flag cannot be used with live captures.\n");
-					res = EXIT_FAILURE;
+					res.m_res = EXIT_FAILURE;
 					goto exit;
 				}
 
@@ -1131,7 +1174,6 @@ int main(int argc, char **argv)
 
 			if(outfile != "")
 			{
-
 				inspector->setup_cycle_writer(outfile, rollover_mb, duration_seconds, file_limit, do_cycle, compress);
 				inspector->autodump_next_file();
 			}
@@ -1146,7 +1188,6 @@ int main(int argc, char **argv)
 			cinfo = do_inspect(inspector,
 				cnt,
 				quiet,
-				absolute_times,
 				print_progress,
 				display_filter,
 				summary_table,
@@ -1183,16 +1224,28 @@ int main(int argc, char **argv)
 	{
 		cerr << e.what() << endl;
 		handle_end_of_file(print_progress);
-		res = EXIT_FAILURE;
+		res.m_res = EXIT_FAILURE;
 	}
 	catch(...)
 	{
 		cerr << "Uknown error" << endl;
 		handle_end_of_file(print_progress);
-		res = EXIT_FAILURE;
+		res.m_res = EXIT_FAILURE;
 	}
 
 exit:
+	//
+	// If any of the chisels is requesting another run,
+	//
+	for(vector<sinsp_chisel*>::iterator it = g_chisels.begin();
+		it != g_chisels.end(); ++it)
+	{
+		string na;
+		if((*it)->get_nextrun_args(&na))
+		{
+			res.m_next_run_args = sinsp_split(na, ' ');
+		}
+	}
 
 	//
 	// If there's a summary table, sort and print it
@@ -1202,6 +1255,9 @@ exit:
 		print_summary_table(inspector, summary_table, 100);
 	}
 
+	//
+	// Free all the stuff that was allocated
+	//
 	free_chisels();
 
 	if(inspector)
@@ -1214,9 +1270,42 @@ exit:
 		delete display_filter;
 	}
 
+	return res;
+}
+
+//
+// MAIN
+//
+int main(int argc, char **argv)
+{
+	sysdig_init_res res;
+
+	res = sysdig_init(argc, argv);
+
+	//
+	// Check if a second run has been requested
+	//
+	if(res.m_next_run_args.size() != 0)
+	{
+		optind = 1;
+		opterr = 1;
+		optopt = '?';
+
+		int newargc = (int)res.m_next_run_args.size() + 1;
+		vector<char*> newargv;
+
+		newargv.push_back(argv[0]);
+
+		for(int32_t j = 1; j < newargc; j++)
+		{
+			newargv.push_back((char*)res.m_next_run_args[j - 1].c_str());
+		}
+
+		res = sysdig_init(newargc, &(newargv[0]));
+	}
 #ifdef _WIN32
 	_CrtDumpMemoryLeaks();
 #endif
 
-	return res;
+	return res.m_res;
 }

@@ -27,6 +27,10 @@ if(NOT DEFINED DIR_ETC)
 	set(DIR_ETC "${CMAKE_INSTALL_PREFIX}/etc")
 endif()
 
+if(NOT CMAKE_BUILD_TYPE)
+	SET(CMAKE_BUILD_TYPE Release)
+endif()
+
 add_definitions(-DPLATFORM_NAME="${CMAKE_SYSTEM_NAME}")
 
 if(NOT WIN32)
@@ -229,13 +233,14 @@ add_subdirectory(userspace/libsinsp)
 
 set(CPACK_PACKAGE_NAME "sysdig")
 set(CPACK_PACKAGE_VENDOR "Draios Inc.")
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "A system exploration and troubleshooting tool")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "sysdig, a system-level exploration and troubleshooting tool")
 set(CPACK_PACKAGE_DESCRIPTION_FILE "${PROJECT_SOURCE_DIR}/scripts/description.txt")
 set(CPACK_PACKAGE_VERSION "${SYSDIG_VERSION}")
 set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CMAKE_SYSTEM_PROCESSOR}")
+set(CPACK_PROJECT_CONFIG_FILE "${PROJECT_SOURCE_DIR}/CMakeCPackOptions.cmake")
 set(CPACK_STRIP_FILES "ON")
 
-set(CPACK_GENERATOR DEB RPM)
+set(CPACK_GENERATOR DEB RPM TGZ)
 
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Draios Inc. <support@draios.com>")
 set(CPACK_DEBIAN_PACKAGE_SECTION "utils")

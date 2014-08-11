@@ -26,6 +26,7 @@ along with sysdig.  If not, see <http://www.gnu.org/licenses/>.
 #ifdef HAS_FILTERING
 #include "filter.h"
 #include "filterchecks.h"
+#include "protodecoder.h"
 #include "appevts.h"
 
 extern sinsp_evttables g_infotables;
@@ -60,6 +61,7 @@ sinsp_filter_check_fd::sinsp_filter_check_fd()
 	m_info.m_name = "fd";
 	m_info.m_fields = sinsp_filter_check_fd_fields;
 	m_info.m_nfiedls = sizeof(sinsp_filter_check_fd_fields) / sizeof(sinsp_filter_check_fd_fields[0]);
+	m_info.m_flags = filter_check_info::FL_WORKS_ON_THREAD_TABLE;
 }
 
 sinsp_filter_check* sinsp_filter_check_fd::allocate_new()
@@ -70,39 +72,6 @@ sinsp_filter_check* sinsp_filter_check_fd::allocate_new()
 int32_t sinsp_filter_check_fd::parse_field_name(const char* str)
 {
 	return sinsp_filter_check::parse_field_name(str);
-}
-
-uint8_t* sinsp_filter_check_fd::extract_fdtype(sinsp_fdinfo_t* fdinfo)
-{
-	switch(fdinfo->m_type)
-	{
-	case SCAP_FD_FILE:
-		return (uint8_t*)"file";
-	case SCAP_FD_DIRECTORY:
-		return (uint8_t*)"directory";
-	case SCAP_FD_IPV4_SOCK:
-	case SCAP_FD_IPV4_SERVSOCK:
-		return (uint8_t*)"ipv4";
-	case SCAP_FD_IPV6_SOCK:
-	case SCAP_FD_IPV6_SERVSOCK:
-		return (uint8_t*)"ipv6";
-	case SCAP_FD_UNIX_SOCK:
-		return (uint8_t*)"unix";
-	case SCAP_FD_FIFO:
-		return (uint8_t*)"pipe";
-	case SCAP_FD_EVENT:
-		return (uint8_t*)"event";
-	case SCAP_FD_SIGNALFD:
-		return (uint8_t*)"signalfd";
-	case SCAP_FD_EVENTPOLL:
-		return (uint8_t*)"eventpoll";
-	case SCAP_FD_INOTIFY:
-		return (uint8_t*)"inotify";
-	case SCAP_FD_TIMERFD:
-		return (uint8_t*)"timerfd";
-	default:
-		return NULL;
-	}
 }
 
 bool sinsp_filter_check_fd::extract_fdname_from_creator(sinsp_evt *evt, OUT uint32_t* len)
@@ -371,7 +340,7 @@ uint8_t* sinsp_filter_check_fd::extract(sinsp_evt *evt, OUT uint32_t* len)
 			return NULL;
 		}
 
-		return extract_fdtype(m_fdinfo);
+		return (uint8_t*)m_fdinfo->get_typestring();
 	case TYPE_DIRECTORY:
 		{
 			if(m_fdinfo == NULL)
@@ -798,34 +767,6 @@ bool sinsp_filter_check_fd::compare(sinsp_evt *evt)
 		&m_val_storage[0]);
 }
 
-char* sinsp_filter_check_fd::tostring(sinsp_evt* evt)
-{
-	uint32_t len;
-
-	uint8_t* rawval = extract(evt, &len);
-
-	if(rawval == NULL)
-	{
-		return NULL;
-	}
-
-	return rawval_to_string(rawval, m_field, len);
-}
-
-Json::Value sinsp_filter_check_fd::tojson(sinsp_evt* evt)
-{
-	uint32_t len;
-
-	uint8_t* rawval = extract(evt, &len);
-
-	if(rawval == NULL)
-	{
-		return Json::Value::null;
-	}
-
-	return rawval_to_json(rawval, m_field, len);
-}
-
 ///////////////////////////////////////////////////////////////////////////////
 // sinsp_filter_check_thread implementation
 ///////////////////////////////////////////////////////////////////////////////
@@ -867,6 +808,7 @@ sinsp_filter_check_thread::sinsp_filter_check_thread()
 	m_info.m_name = "process";
 	m_info.m_fields = sinsp_filter_check_thread_fields;
 	m_info.m_nfiedls = sizeof(sinsp_filter_check_thread_fields) / sizeof(sinsp_filter_check_thread_fields[0]);
+	m_info.m_flags = filter_check_info::FL_WORKS_ON_THREAD_TABLE;
 
 	m_u64val = 0;
 }
@@ -1124,7 +1066,7 @@ uint8_t* sinsp_filter_check_thread::extract(sinsp_evt *evt, OUT uint32_t* len)
 	case TYPE_PNAME:
 		{
 			sinsp_threadinfo* ptinfo = 
-				m_inspector->get_thread(tinfo->m_ptid);
+				m_inspector->get_thread(tinfo->m_ptid, false, true);
 
 			if(ptinfo != NULL)
 			{
@@ -1455,7 +1397,7 @@ const filtercheck_field_info sinsp_filter_check_event_fields[] =
 	{PT_UINT64, EPF_NONE, PF_DEC, "evt.num", "event number."},
 	{PT_CHARBUF, EPF_NONE, PF_NA, "evt.time", "event timestamp as a time string that includes the nanosecond part."},
 	{PT_CHARBUF, EPF_NONE, PF_NA, "evt.time.s", "event timestamp as a time string with no nanoseconds."},
-	{PT_CHARBUF, EPF_NONE, PF_NA, "evt.datetime", "event timestamp as a time string that inclused the date."},
+	{PT_CHARBUF, EPF_NONE, PF_NA, "evt.datetime", "event timestamp as a time string that includes the date."},
 	{PT_ABSTIME, EPF_NONE, PF_DEC, "evt.rawtime", "absolute event timestamp, i.e. nanoseconds from epoch."},
 	{PT_ABSTIME, EPF_NONE, PF_DEC, "evt.rawtime.s", "integer part of the event timestamp (e.g. seconds since epoch)."},
 	{PT_ABSTIME, EPF_NONE, PF_10_PADDED_DEC, "evt.rawtime.ns", "fractional part of the absolute event timestamp."},
@@ -1471,6 +1413,7 @@ const filtercheck_field_info sinsp_filter_check_event_fields[] =
 	{PT_CHARBUF, EPF_NONE, PF_NA, "evt.args", "all the event arguments, aggregated into a single string."},
 	{PT_CHARBUF, EPF_REQUIRES_ARGUMENT, PF_NA, "evt.arg", "one of the event arguments specified by name or by number. Some events (e.g. return codes or FDs) will be converted into a text representation when possible. E.g. 'resarg.fd' or 'resarg[0]'."},
 	{PT_DYN, EPF_REQUIRES_ARGUMENT, PF_NA, "evt.rawarg", "one of the event arguments specified by name. E.g. 'arg.fd'."},
+	{PT_CHARBUF, EPF_NONE, PF_NA, "evt.info", "for most events, this field returns the same value as evt.args. However, for some events (like writes to /dev/log) it provides higher level information coming from decoding the arguments."},
 	{PT_BYTEBUF, EPF_NONE, PF_NA, "evt.buffer", "the binary data buffer for events that have one, like read(), recvfrom(), etc. Use this field in filters with 'contains' to search into I/O data buffers."},
 	{PT_CHARBUF, EPF_NONE, PF_DEC, "evt.res", "event return value, as an error code string (e.g. 'ENOENT')."},
 	{PT_INT64, EPF_NONE, PF_DEC, "evt.rawres", "event return value, as a number (e.g. -2). Useful for range comparisons."},
@@ -1480,7 +1423,9 @@ const filtercheck_field_info sinsp_filter_check_event_fields[] =
 	{PT_BOOL, EPF_NONE, PF_NA, "evt.is_io_write", "'true' for events that write to FDs, like write(), send(), etc."},
 	{PT_CHARBUF, EPF_NONE, PF_NA, "evt.io_dir", "'r' for events that read from FDs, like read(); 'w' for events that write to FDs, like write()."},
 	{PT_BOOL, EPF_NONE, PF_NA, "evt.is_wait", "'true' for events that make the thread wait, e.g. sleep(), select(), poll()."},
+	{PT_BOOL, EPF_NONE, PF_NA, "evt.is_syslog", "'true' for events that are writes to /dev/log."},
 	{PT_UINT32, EPF_NONE, PF_DEC, "evt.count", "This filter field always returns 1 and can be used to count events from inside chisels."},
+	{PT_UINT64, EPF_FILTER_ONLY, PF_DEC, "evt.around", "Accepts the event if it's around the specified time interval. The syntax is evt.around[T]=D, where T is the value returned by %evt.rawtime for the event and D is a delta in milliseconds. For example, evt.around[1404996934793590564]=1000 will return the events with timestamp with one second before the timestamp and one second after it, for a total of two seconds of capture."},
 	// App events related fields. These can be used only as filter fields, not as display fields
 	{PT_UINT64, EPF_FILTER_ONLY, PF_DEC, "evt.appevt.id", "event ID."},
 	{PT_UINT32, EPF_FILTER_ONLY, PF_DEC, "evt.appevt.ntags", "Number of tags that this user event has."},
@@ -1530,11 +1475,25 @@ inline int32_t sinsp_filter_check_event::extract_arg(string fldname, string val,
 
 		parsed_len = (uint32_t)val.find(']');
 		string numstr = val.substr(fldname.size() + 1, parsed_len - fldname.size() - 1);
-		m_argid = sinsp_numparser::parsed32(numstr);
+
+		if(m_field_id == TYPE_AROUND)
+		{
+			m_u64val = sinsp_numparser::parseu64(numstr);		
+		}
+		else
+		{
+			m_argid = sinsp_numparser::parsed32(numstr);
+		}
+
 		parsed_len++;
 	}
 	else if(val[fldname.size()] == '.')
 	{
+		if(m_field_id == TYPE_AROUND)
+		{
+			throw sinsp_exception("wrong syntax for evt.around");
+		}
+
 		const struct ppm_param_info* pi = 
 			sinsp_utils::find_longest_matching_evt_param(val.substr(fldname.size() + 1));
 
@@ -1619,10 +1578,18 @@ int32_t sinsp_filter_check_event::parse_field_name(const char* str)
 	{
 		m_field_id = TYPE_ARGRAW;
 		m_customfield = m_info.m_fields[m_field_id];
+		m_field = &m_customfield;
 
 		res = extract_arg("evt.rawarg", val, &m_arginfo);
 
 		m_customfield.m_type = m_arginfo->type;
+	}
+	else if(string(val, 0, sizeof("evt.around") - 1) == "evt.around")
+	{
+		m_field_id = TYPE_AROUND;
+		m_field = &m_info.m_fields[m_field_id];
+
+		return extract_arg("evt.around", val, NULL);
 	}
 	else if(string(val, 0, sizeof("evt.latency") - 1) == "evt.latency" ||
 		string(val, 0, sizeof("evt.latency.s") - 1) == "evt.latency.s" ||
@@ -1690,6 +1657,19 @@ void sinsp_filter_check_event::parse_filter_value(const char* str, uint32_t len)
 		}
 
 		throw sinsp_exception("unknown event type " + stype);
+	}
+	else if(m_field_id == TYPE_AROUND)
+	{
+		if(m_cmpop != CO_EQ)
+		{
+			throw sinsp_exception("evt.around supports only '=' comparison operator");
+		}
+
+		sinsp_filter_check::parse_filter_value(str, len);
+
+		m_tsdelta = sinsp_numparser::parseu64(str) * 1000000;
+
+		return;
 	}
 	else
 	{
@@ -1811,52 +1791,6 @@ Json::Value sinsp_filter_check_event::extract_as_js(sinsp_evt *evt, OUT uint32_t
 	case TYPE_LATENCY_S:
 	case TYPE_LATENCY_NS:
 		return (Json::Value::Int64)*(uint64_t*)extract(evt, len);
-
-	case TYPE_ARGS:
-		{
-			if(evt->get_type() == PPME_GENERIC_E || evt->get_type() == PPME_GENERIC_X)
-			{
-				//
-				// Don't print the arguments for generic events: they have only internal use
-				//
-				return (uint8_t*)"";
-			}
-
-			const char* resolved_argstr = NULL;
-			uint32_t nargs = evt->get_num_params();
-			m_strstorage.clear();
-
-			Json::Value root;
-			Json::Value value;
-			for(uint32_t j = 0; j < nargs; j++)
-			{
-				ASSERT(m_inspector != NULL);
-
-				evt->get_param_as_str(j, &resolved_argstr, m_inspector->get_buffer_format());
-				value = evt->get_param_as_json(j, &resolved_argstr, m_inspector->get_buffer_format());
-
-				if(resolved_argstr[0] == 0)
-				{
-					root[evt->get_param_name(j)] = value;
-				}
-				else
-				{
-					Json::Value arr_value(Json::arrayValue);
-					arr_value[0] = value;
-					arr_value[1] = resolved_argstr;
-					root[evt->get_param_name(j)] = arr_value;
-				}
-			}
-
-			return root;
-		}
-		break;
-
-	case TYPE_RESSTR:
-	case TYPE_RESRAW:
-		return Json::Value::null;
-		break;
-
 	case TYPE_COUNT:
 		m_u32val = 1;
 		return m_u32val;
@@ -2040,6 +1974,29 @@ uint8_t* sinsp_filter_check_event::extract(sinsp_evt *evt, OUT uint32_t* len)
 			}
 		}
 		break;
+	case TYPE_INFO:
+		{
+			sinsp_fdinfo_t* fdinfo = evt->m_fdinfo;
+
+			if(fdinfo != NULL)
+			{
+				char* il;
+				vector<sinsp_protodecoder*>* cbacks = &(fdinfo->m_write_callbacks);
+
+				vector<sinsp_protodecoder*>::iterator it;
+				for(it = cbacks->begin(); it != cbacks->end(); ++it)
+				{
+					if((*it)->get_info_line(&il))
+					{
+						return (uint8_t*)il;
+					}
+				}
+			}
+		}
+		//
+		// NOTE: this falls through to TYPE_ARGSTR, and that's what we want!
+		//       Please don't add anything here!
+		//
 	case TYPE_ARGS:
 		{
 			if(evt->get_type() == PPME_GENERIC_E || evt->get_type() == PPME_GENERIC_X)
@@ -2262,6 +2219,26 @@ uint8_t* sinsp_filter_check_event::extract(sinsp_evt *evt, OUT uint32_t* len)
 		}
 
 		return (uint8_t*)&m_u32val;
+	case TYPE_ISSYSLOG:
+		{
+			m_u32val = 0;
+
+			ppm_event_flags eflags = evt->get_flags();
+			if(eflags & EF_WRITES_TO_FD)
+			{
+				sinsp_fdinfo_t* fdinfo = evt->m_fdinfo;
+
+				if(fdinfo != NULL)
+				{
+					if(fdinfo->m_name.find("/dev/log") != string::npos)
+					{
+						m_u32val = 1;
+					}
+				}
+			}
+
+			return (uint8_t*)&m_u32val;
+		}
 	case TYPE_COUNT:
 		m_u32val = 1;
 		return (uint8_t*)&m_u32val;
@@ -2271,56 +2248,6 @@ uint8_t* sinsp_filter_check_event::extract(sinsp_evt *evt, OUT uint32_t* len)
 	}
 
 	return NULL;
-}
-
-char* sinsp_filter_check_event::tostring(sinsp_evt* evt)
-{
-	if(m_field_id == TYPE_ARGRAW)
-	{
-		uint32_t len;
-		uint8_t* rawval = extract(evt, &len);
-
-		if(rawval == NULL)
-		{
-			return NULL;
-		}
-
-		return rawval_to_string(rawval, &m_customfield, len);
-	}
-	else
-	{
-		return sinsp_filter_check::tostring(evt);
-	}
-}
-
-Json::Value sinsp_filter_check_event::tojson(sinsp_evt* evt)
-{
-	uint32_t len;
-	Json::Value jsonval = extract_as_js(evt, &len);
-
-	if(jsonval == Json::Value::null) 
-	{
-		if(m_field_id == TYPE_ARGRAW)
-		{
-			uint32_t len;
-			uint8_t* rawval = extract(evt, &len);
-
-			if(rawval == NULL)
-			{
-				return Json::Value::null;
-			}
-
-			return rawval_to_json(rawval, &m_customfield, len);
-		}
-		else
-		{
-			return sinsp_filter_check::tojson(evt);
-		}
-	} 
-	else 
-	{
-		return jsonval;
-	}
 }
 
 inline bool sinsp_filter_check_event::compare_appevt(sinsp_evt *evt, sinsp_partial_appevt* pae)
@@ -2648,6 +2575,24 @@ bool sinsp_filter_check_event::compare(sinsp_evt *evt)
 
 		res = false;
 	}
+	else if(m_field_id == TYPE_AROUND)
+	{
+		uint64_t ts = evt->get_ts();
+		uint64_t t1 = ts - m_tsdelta;
+		uint64_t t2 = ts + m_tsdelta;
+
+		bool res1 = flt_compare(CO_GE,
+			PT_UINT64,
+			&m_u64val,
+			&t1);
+
+		bool res2 = flt_compare(CO_LE,
+			PT_UINT64,
+			&m_u64val,
+			&t2);
+
+		return res1 && res2;
+	}
 	else
 	{
 		res = sinsp_filter_check::compare(evt);
@@ -2675,6 +2620,7 @@ sinsp_filter_check_user::sinsp_filter_check_user()
 	m_info.m_name = "user";
 	m_info.m_fields = sinsp_filter_check_user_fields;
 	m_info.m_nfiedls = sizeof(sinsp_filter_check_user_fields) / sizeof(sinsp_filter_check_user_fields[0]);
+	m_info.m_flags = filter_check_info::FL_WORKS_ON_THREAD_TABLE;
 }
 
 sinsp_filter_check* sinsp_filter_check_user::allocate_new()
@@ -2748,6 +2694,7 @@ sinsp_filter_check_group::sinsp_filter_check_group()
 	m_info.m_name = "group";
 	m_info.m_fields = sinsp_filter_check_group_fields;
 	m_info.m_nfiedls = sizeof(sinsp_filter_check_group_fields) / sizeof(sinsp_filter_check_group_fields[0]);
+	m_info.m_flags = filter_check_info::FL_WORKS_ON_THREAD_TABLE;
 }
 
 sinsp_filter_check* sinsp_filter_check_group::allocate_new()
@@ -3186,6 +3133,68 @@ uint8_t* rawstring_check::extract(sinsp_evt *evt, OUT uint32_t* len)
 {
 	*len = m_text_len;
 	return (uint8_t*)m_text.c_str();
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// sinsp_filter_check_syslog implementation
+///////////////////////////////////////////////////////////////////////////////
+const filtercheck_field_info sinsp_filter_check_syslog_fields[] =
+{
+	{PT_CHARBUF, EPF_NONE, PF_NA, "syslog.facility.str", "facility as a string."},
+	{PT_UINT32, EPF_NONE, PF_DEC, "syslog.facility", "facility as a number (0-23)."},
+	{PT_CHARBUF, EPF_NONE, PF_NA, "syslog.severity.str", "severity as a string. Can have one of these values: emerg, alert, crit, err, warn, notice, info, debug"},
+	{PT_UINT32, EPF_NONE, PF_DEC, "syslog.severity", "severity as a number (0-7)."},
+	{PT_CHARBUF, EPF_NONE, PF_NA, "syslog.message", "message sent to syslog."},
+};
+
+sinsp_filter_check_syslog::sinsp_filter_check_syslog()
+{
+	m_info.m_name = "syslog";
+	m_info.m_fields = sinsp_filter_check_syslog_fields;
+	m_info.m_nfiedls = sizeof(sinsp_filter_check_syslog_fields) / sizeof(sinsp_filter_check_syslog_fields[0]);
+	m_decoder = NULL;
+}
+
+sinsp_filter_check* sinsp_filter_check_syslog::allocate_new()
+{
+	return (sinsp_filter_check*) new sinsp_filter_check_syslog();
+}
+
+int32_t sinsp_filter_check_syslog::parse_field_name(const char* str)
+{
+	int32_t res = sinsp_filter_check::parse_field_name(str);
+	if(res != -1)
+	{
+		m_decoder = (sinsp_decoder_syslog*)m_inspector->require_protodecoder("syslog");
+	}
+
+	return res;
+}
+
+uint8_t* sinsp_filter_check_syslog::extract(sinsp_evt *evt, OUT uint32_t* len)
+{
+	ASSERT(m_decoder != NULL);
+	if(!m_decoder->is_data_valid())
+	{
+		return NULL;
+	}
+
+	switch(m_field_id)
+	{
+	case TYPE_FACILITY:
+		return (uint8_t*)&m_decoder->m_facility;
+	case TYPE_FACILITY_STR:
+		return (uint8_t*)m_decoder->get_facility_str();
+	case TYPE_SEVERITY:
+		return (uint8_t*)&m_decoder->m_severity;
+	case TYPE_SEVERITY_STR:
+		return (uint8_t*)m_decoder->get_severity_str();
+	case TYPE_MESSAGE:
+		return (uint8_t*)m_decoder->m_msg.c_str();
+	default:
+		ASSERT(false);
+		return NULL;
+	}
 }
 
 #endif // HAS_FILTERING

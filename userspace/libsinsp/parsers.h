@@ -45,6 +45,18 @@ public:
 	//
 	static void parse_openat_dir(sinsp_evt *evt, char* name, int64_t dirfd, OUT string* sdir);
 
+	//
+	// Protocol decoder infrastructure methods
+	//
+	sinsp_protodecoder* add_protodecoder(string decoder_name);
+	void register_event_callback(sinsp_pd_callback_type etype, sinsp_protodecoder* dec);
+
+	//
+	// Protocol decoders callback lists
+	//
+	vector<sinsp_protodecoder*> m_open_callbacks;
+	vector<sinsp_protodecoder*> m_connect_callbacks;
+
 private:
 	//
 	// Helpers
@@ -108,7 +120,9 @@ private:
 	int64_t m_sysdig_pid;
 #endif
 
+	//
 	// Temporary storage to avoid memory allocation
+	//
 	sinsp_evt m_tmp_evt;
 	uint8_t m_fake_userevt_storage[4096];
 	scap_evt* m_fake_userevt;
@@ -117,6 +131,12 @@ private:
 	// FD listener callback
 	sinsp_fd_listener* m_fd_listener;
 
+	//
+	// The protocol decoders allocated by this parser
+	//
+	vector<sinsp_protodecoder*> m_protodecoders;
+
 	friend class sinsp_analyzer;
 	friend class sinsp_analyzer_fd_listener;
+	friend class sinsp_protodecoder;
 };

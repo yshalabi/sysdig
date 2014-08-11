@@ -24,6 +24,8 @@ along with sysdig.  If not, see <http://www.gnu.org/licenses/>.
 #define CANCELED_FD_NUMBER std::numeric_limits<int64_t>::max()
 #endif
 
+class sinsp_protodecoder;
+
 // fd type characters
 #define CHAR_FD_FILE			'f'
 #define CHAR_FD_IPV4_SOCK		'4'
@@ -76,6 +78,18 @@ public:
 	  Refer to the CHAR_FD_* defines in this fdinfo.h.
 	*/
 	char get_typechar();
+
+	/*!
+	  \brief Return an ASCII string that identifies the FD type.
+
+	  Can be on of 'file', 'directory', ipv4', 'ipv6', 'unix', 'pipe', 'event', 'signalfd', 'eventpoll', 'inotify', 'signalfd'.
+	*/
+	char* get_typestring();
+
+	/*!
+	  \brief Return the fd name, after removing unprintable or invalid characters from it.
+	*/
+	string tostring_clean();
 
 	/*!
 	  \brief Returns true if this is a unix socket.
@@ -145,6 +159,16 @@ public:
 	  \brief If this is a socket, returns the IP protocol. Otherwise, return SCAP_FD_UNKNOWN.
 	*/
 	scap_l4_proto get_l4proto();
+
+	/*!
+	  \brief Used by protocol decoders to register callbacks related to this FD.
+	*/
+	void register_event_callback(sinsp_pd_callback_type etype, sinsp_protodecoder* dec);
+
+	/*!
+	  \brief Used by protocol decoders to unregister callbacks related to this FD.
+	*/
+	void unregister_event_callback(sinsp_pd_callback_type etype, sinsp_protodecoder* dec);
 
 	scap_fd_type m_type; ///< The fd type, e.g. file, directory, IPv4 socket...
 	uint32_t m_openflags; ///< If this FD is a file, the flags that were used when opening it. See the PPM_O_* definitions in driver/ppm_events_public.h.
@@ -247,6 +271,9 @@ private:
 	uint32_t m_flags;
 	uint64_t m_ino;
 
+	vector<sinsp_protodecoder*> m_write_callbacks;
+	vector<sinsp_protodecoder*> m_read_callbacks;
+
 	friend class sinsp_parser;
 	friend class sinsp_threadinfo;
 	friend class sinsp_analyzer;
@@ -254,6 +281,7 @@ private:
 	friend class sinsp_analyzer_fd_listener;
 	friend class sinsp_fdtable;
 	friend class sinsp_filter_check_fd;
+	friend class sinsp_filter_check_event;
 };
 
 /*@}*/

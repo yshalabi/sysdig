@@ -32,11 +32,11 @@ along with sysdig.  If not, see <http://www.gnu.org/licenses/>.
 #include "filter.h"
 #include "filterchecks.h"
 #include "cyclewriter.h"
+#include "protodecoder.h"
 #ifdef HAS_ANALYZER
 #include "analyzer_int.h"
 #include "analyzer.h"
 #endif
-//#include "drfilterParser.h"
 
 extern sinsp_evttables g_infotables;
 #ifdef HAS_CHISELS
@@ -58,7 +58,8 @@ sinsp::sinsp() :
 	m_max_thread_table_size = MAX_THREAD_TABLE_SIZE;
 	m_thread_timeout_ns = DEFAULT_THREAD_TIMEOUT_S * ONE_SECOND_IN_NS;
 	m_inactive_thread_scan_time_ns = DEFAULT_INACTIVE_THREAD_SCAN_TIME_S * ONE_SECOND_IN_NS;
-	m_cycle_writer = new cycle_writer();
+	m_cycle_writer = NULL;
+	m_write_cycling = false;
 
 #ifdef HAS_ANALYZER
 	m_analyzer = NULL;
@@ -77,6 +78,7 @@ sinsp::sinsp() :
 	m_snaplen = DEFAULT_SNAPLEN;
 	m_buffer_format = sinsp_evt::PF_NORMAL;
 	m_isdebug_enabled = false;
+	m_isfatfile_enabled = false;
 	m_filesize = -1;
 	m_track_appevts_state = false;
 
@@ -114,6 +116,17 @@ sinsp::~sinsp()
 	ASSERT(m_profile_fp != NULL);
 	fclose(m_profile_fp);
 #endif
+
+	if(m_cycle_writer)
+	{
+		delete m_cycle_writer;
+		m_cycle_writer = NULL;
+	}
+}
+
+void sinsp::add_protodecoders()
+{
+	m_parser->add_protodecoder("syslog");
 }
 
 void sinsp::init()
@@ -133,9 +146,19 @@ void sinsp::init()
 	}
 
 	//
+	// Attach the protocol decoders
+	//
+	add_protodecoders();
+
+	//
 	// Reset the thread manager
 	//
 	m_thread_manager->clear();
+
+	//
+	// Allocate the cycle writer
+	//
+	m_cycle_writer = new cycle_writer();
 
 	//
 	// Basic inits
@@ -203,6 +226,8 @@ void sinsp::open(string filename)
 		open();
 		return;
 	}
+
+	m_input_filename = filename;
 
 	g_logger.log("starting offline capture");
 
@@ -321,13 +346,7 @@ void sinsp::import_thread_table()
 	//
 	// Scan the list to create the proper parent/child dependencies
 	//
-	threadinfo_map_iterator_t it;
-	for(it = m_thread_manager->m_threadtable.begin();
-		it != m_thread_manager->m_threadtable.end(); ++it)
-	{
-		m_thread_manager->increment_mainthread_childcount(&it->second);
-		m_thread_manager->increment_program_childcount(&it->second);
-	}
+	m_thread_manager->create_child_dependencies();
 
 	//
 	// Scan the list to fix the direction of the sockets
@@ -372,6 +391,20 @@ bool should_drop(sinsp_evt *evt, bool* stopped, bool* switched);
 
 int32_t sinsp::next(OUT sinsp_evt **evt)
 {
+	//
+	// Reset previous event's decoders if required
+	//
+	if(m_decoders_reset_list.size() != 0)
+	{
+		vector<sinsp_protodecoder*>::iterator it;
+		for(it = m_decoders_reset_list.begin(); it != m_decoders_reset_list.end(); ++it)
+		{
+			(*it)->on_reset(&m_evt);
+		}
+
+		m_decoders_reset_list.clear();
+	}
+
 	//
 	// Get the event from libscap
 	//
@@ -426,7 +459,7 @@ int32_t sinsp::next(OUT sinsp_evt **evt)
 	//
 	if(m_tid_to_remove != -1)
 	{
-		remove_thread(m_tid_to_remove);
+		remove_thread(m_tid_to_remove, false);
 		m_tid_to_remove = -1;
 	}
 #endif // HAS_ANALYZER
@@ -448,7 +481,7 @@ int32_t sinsp::next(OUT sinsp_evt **evt)
 
 	if(nfdr != 0)
 	{
-		sinsp_threadinfo* ptinfo = get_thread(m_tid_of_fd_to_remove, true);
+		sinsp_threadinfo* ptinfo = get_thread(m_tid_of_fd_to_remove, true, true);
 		if(!ptinfo)
 		{
 			ASSERT(false);
@@ -506,39 +539,60 @@ int32_t sinsp::next(OUT sinsp_evt **evt)
 	//
 	if(NULL != m_dumper)
 	{
-		scap_evt* pdevt = (m_evt.m_poriginal_evt)? m_evt.m_poriginal_evt : m_evt.m_pevt;
+#if defined(HAS_FILTERING) && defined(HAS_CAPTURE_FILTERING)
+		scap_dump_flags dflags;
 		
-		res = scap_number_of_bytes_to_write(pdevt, m_evt.m_cpuid, &bytes_to_write);
-		if(SCAP_SUCCESS != res)
+		bool do_drop;
+		dflags = m_evt.get_dump_flags(&do_drop);
+		if(do_drop)
 		{
-			throw sinsp_exception(scap_getlasterr(m_h));
+			*evt = &m_evt;
+			return SCAP_TIMEOUT;
 		}
-		else 
+#endif
+
+		if(m_write_cycling)
 		{
-			switch(m_cycle_writer->consider(bytes_to_write))
+			res = scap_number_of_bytes_to_write(m_evt.m_pevt, m_evt.m_cpuid, &bytes_to_write);
+			if(SCAP_SUCCESS != res)
 			{
-				case cycle_writer::NEWFILE:
-					autodump_next_file();
-					break;
-
-				case cycle_writer::DOQUIT:
-					stop_capture();
-					return SCAP_EOF;
-					break;
-
-				case cycle_writer::SAMEFILE:
-					// do nothing.
-					break;
+				throw sinsp_exception(scap_getlasterr(m_h));
 			}
-		} 
+			else 
+			{
+				switch(m_cycle_writer->consider(bytes_to_write))
+				{
+					case cycle_writer::NEWFILE:
+						autodump_next_file();
+						break;
 
-		res = scap_dump(m_h, m_dumper, pdevt, m_evt.m_cpuid);
+					case cycle_writer::DOQUIT:
+						stop_capture();
+						return SCAP_EOF;
+						break;
 
+					case cycle_writer::SAMEFILE:
+						// do nothing.
+						break;
+				}
+			}
+		}
+
+		scap_evt* pdevt = (m_evt.m_poriginal_evt)? m_evt.m_poriginal_evt : m_evt.m_pevt;
+		res = scap_dump(m_h, m_dumper, pdevt, m_evt.m_cpuid, dflags);
 		if(SCAP_SUCCESS != res)
 		{
 			throw sinsp_exception(scap_getlasterr(m_h));
 		}
 	}
+
+#if defined(HAS_FILTERING) && defined(HAS_CAPTURE_FILTERING)
+	if(m_evt.m_flt_flag & sinsp_evt::FF_FILTER_OUT)
+	{
+		*evt = &m_evt;
+		return SCAP_TIMEOUT;
+	}
+#endif
 
 	//
 	// Run the analysis engine
@@ -591,38 +645,42 @@ uint64_t sinsp::get_num_events()
 	return scap_event_get_num(m_h);
 }
 
-sinsp_threadinfo* sinsp::get_thread(int64_t tid, bool query_os_if_not_found)
+sinsp_threadinfo* sinsp::get_thread(int64_t tid, bool query_os_if_not_found, bool lookup_only)
 {
-	sinsp_threadinfo* sinsp_proc = m_thread_manager->get_thread(tid);
+	sinsp_threadinfo* sinsp_proc = m_thread_manager->get_thread(tid, lookup_only);
 
 	if(sinsp_proc == NULL && query_os_if_not_found)
 	{
-		sinsp_threadinfo newti(this);
 		scap_threadinfo* scap_proc = NULL;
-		m_n_proc_lookups++;
+		sinsp_threadinfo newti(this);
 
-		if(m_n_proc_lookups == m_max_n_proc_socket_lookups)
+		if(m_thread_manager->m_threadtable.size() < m_max_thread_table_size)
 		{
-			g_logger.format(sinsp_logger::SEV_INFO, "Reached max socket lookup number");
-		}
+			m_n_proc_lookups++;
 
-		if(m_n_proc_lookups == m_max_n_proc_lookups)
-		{
-			g_logger.format(sinsp_logger::SEV_INFO, "Reached max processs lookup number");
-		}
-
-		if(m_max_n_proc_lookups == 0 || (m_max_n_proc_lookups != 0 &&
-			(m_n_proc_lookups <= m_max_n_proc_lookups)))
-		{
-			bool scan_sockets = true;
-
-			if(m_max_n_proc_socket_lookups == 0 || (m_max_n_proc_socket_lookups != 0 &&
-				(m_n_proc_lookups <= m_max_n_proc_socket_lookups)))
+			if(m_n_proc_lookups == m_max_n_proc_socket_lookups)
 			{
-				scan_sockets = false;
+				g_logger.format(sinsp_logger::SEV_INFO, "Reached max socket lookup number");
 			}
 
-			scap_proc = scap_proc_get(m_h, tid, scan_sockets);
+			if(m_n_proc_lookups == m_max_n_proc_lookups)
+			{
+				g_logger.format(sinsp_logger::SEV_INFO, "Reached max processs lookup number");
+			}
+
+			if(m_max_n_proc_lookups == 0 || (m_max_n_proc_lookups != 0 &&
+				(m_n_proc_lookups <= m_max_n_proc_lookups)))
+			{
+				bool scan_sockets = true;
+
+				if(m_max_n_proc_socket_lookups == 0 || (m_max_n_proc_socket_lookups != 0 &&
+					(m_n_proc_lookups <= m_max_n_proc_socket_lookups)))
+				{
+					scan_sockets = false;
+				}
+
+				scap_proc = scap_proc_get(m_h, tid, scan_sockets);
+			}
 		}
 
 		if(scap_proc)
@@ -642,10 +700,29 @@ sinsp_threadinfo* sinsp::get_thread(int64_t tid, bool query_os_if_not_found)
 			newti.m_exe = "<NA>";
 			newti.m_uid = 0xffffffff;
 			newti.m_gid = 0xffffffff;
+			newti.m_nchilds = 0;
 		}
 
-		m_thread_manager->add_thread(newti);
-		sinsp_proc = m_thread_manager->get_thread(tid);
+		//
+		// Since this thread is created out of thin air, we need to
+		// properly set its reference count, by scanning the table 
+		//
+		threadinfo_map_t* pttable = &m_thread_manager->m_threadtable;
+		threadinfo_map_iterator_t it;
+
+		for(it = pttable->begin(); it != pttable->end(); ++it)
+		{
+			if(it->second.m_pid == tid)
+			{
+				newti.m_nchilds++;
+			}
+		}
+
+		//
+		// Done. Add the new thread to the list.
+		//
+		m_thread_manager->add_thread(newti, false);
+		sinsp_proc = m_thread_manager->get_thread(tid, lookup_only);
 	}
 
 	return sinsp_proc;
@@ -653,17 +730,17 @@ sinsp_threadinfo* sinsp::get_thread(int64_t tid, bool query_os_if_not_found)
 
 sinsp_threadinfo* sinsp::get_thread(int64_t tid)
 {
-	return get_thread(tid, false);
+	return get_thread(tid, false, true);
 }
 
 void sinsp::add_thread(const sinsp_threadinfo& ptinfo)
 {
-	m_thread_manager->add_thread((sinsp_threadinfo&)ptinfo);
+	m_thread_manager->add_thread((sinsp_threadinfo&)ptinfo, false);
 }
 
-void sinsp::remove_thread(int64_t tid)
+void sinsp::remove_thread(int64_t tid, bool force)
 {
-	m_thread_manager->remove_thread(tid);
+	m_thread_manager->remove_thread(tid, force);
 }
 
 void sinsp::set_snaplen(uint32_t snaplen)
@@ -736,7 +813,14 @@ void sinsp::set_filter(const string& filter)
 	}
 
 	m_filter = new sinsp_filter(this, filter);
+	m_filterstring = filter;
 }
+
+const string sinsp::get_filter()
+{
+	return m_filterstring;
+}
+
 #endif
 
 const scap_machine_info* sinsp::get_machine_info()
@@ -879,9 +963,24 @@ void sinsp::set_debug_mode(bool enable_debug)
 	m_isdebug_enabled = enable_debug;
 }
 
+void sinsp::set_fatfile_dump_mode(bool enable_fatfile)
+{
+	m_isfatfile_enabled = enable_fatfile;
+}
+
 bool sinsp::is_debug_enabled()
 {
 	return m_isdebug_enabled;
+}
+
+sinsp_protodecoder* sinsp::require_protodecoder(string decoder_name)
+{
+	return m_parser->add_protodecoder(decoder_name);
+}
+
+void sinsp::protodecoder_register_reset(sinsp_protodecoder* dec)
+{
+	m_decoders_reset_list.push_back(dec);
 }
 
 sinsp_parser* sinsp::get_parser()
@@ -892,6 +991,11 @@ sinsp_parser* sinsp::get_parser()
 bool sinsp::setup_cycle_writer(string base_file_name, int rollover_mb, int duration_seconds, int file_limit, bool do_cycle, bool compress) 
 {
 	m_compress = compress;
+
+	if(rollover_mb != 0 || duration_seconds != 0 || file_limit != 0 || do_cycle == true)
+	{
+		m_write_cycling = true;
+	}
 
 	return m_cycle_writer->setup(base_file_name, rollover_mb, duration_seconds, file_limit, do_cycle);
 }

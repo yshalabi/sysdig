@@ -81,6 +81,18 @@ using namespace std;
 
 #define ONE_SECOND_IN_NS 1000000000LL
 
+//
+// Protocol decoder callback type
+//
+typedef enum sinsp_pd_callback_type
+{
+	CT_OPEN,
+	CT_CONNECT,
+	CT_READ,
+	CT_WRITE,
+	CT_TUPLE_CHANGE,
+}sinsp_pd_callback_type;
+
 #include "tuples.h"
 #include "fdinfo.h"
 #include "threadinfo.h"
@@ -95,6 +107,7 @@ class sinsp_usrevtstorage;
 class sinsp_partial_appevt;
 template<typename OBJ> class simple_lifo_queue;
 class cycle_writer;
+class sinsp_protodecoder;
 
 vector<string> sinsp_split(const string &s, char delim);
 
@@ -104,9 +117,21 @@ vector<string> sinsp_split(const string &s, char delim);
 class filter_check_info
 {
 public:
+	enum flags
+	{
+		FL_NONE =   0,
+		FL_WORKS_ON_THREAD_TABLE = (1 << 0),	///< This filter check class supports filtering incomplete events that contain only valid thread info and FD info.
+	};
+
+	filter_check_info()
+	{
+		m_flags = 0;
+	}
+
 	string m_name; ///< Field class name.
 	int32_t m_nfiedls; ///< Number of fields in this field group.
 	const filtercheck_field_info* m_fields; ///< Array containing m_nfiedls field descriptions.
+	uint32_t m_flags;
 };
 
 /*!
@@ -256,6 +281,14 @@ public:
 	   the filter is invalid.
 	*/
 	void set_filter(const string& filter);
+
+	/*!
+	  \brief Return the filter set for this capture.
+
+	  \return the filter previously set with \ref set_filter(), or an empty 
+	   string if no filter has been set yet.
+	*/
+	const string get_filter();
 #endif
 
 	/*!
@@ -351,7 +384,7 @@ public:
 	  @throws a sinsp_exception containing the error string is thrown in case
 	   of failure.
 	*/
-	sinsp_threadinfo* get_thread(int64_t tid, bool query_os_if_not_found);
+	sinsp_threadinfo* get_thread(int64_t tid, bool query_os_if_not_found, bool lookup_only);
 
 	/*!
 	  \brief Return the table with all the machine users.
@@ -453,9 +486,41 @@ public:
 	void set_debug_mode(bool enable_debug);
 
 	/*!
+	  \brief Set the fatfile mode when writing events to file.
+
+	  \note fatfile mode involves saving "hidden" events in the trace file 
+	   that make it possible to preserve full state even when filters that
+	   would drop state packets are used during the capture.
+	*/
+	void set_fatfile_dump_mode(bool enable_fatfile);
+
+	/*!
 	  \brief Returns true if the debug mode is enabled.
 	*/
 	bool is_debug_enabled();
+
+	/*!
+	  \brief Lets a filter plugin request a protocol decoder.
+
+	  \param the name of the required decoder
+	*/
+	sinsp_protodecoder* require_protodecoder(string decoder_name);
+
+	/*!
+	  \brief Lets a filter plugin request a protocol decoder.
+
+	  \param the name of the required decoder
+	*/
+	void protodecoder_register_reset(sinsp_protodecoder* dec);
+
+	/*!
+	  \brief If this is an offline capture, return the name of the file that is
+	   being read, otherwise return an empty string.
+	*/
+	string get_input_filename()
+	{
+		return m_input_filename;
+	}
 
 	/*!
 	  \brief Return the progress when reading trace files.
@@ -554,14 +619,17 @@ private:
 	void import_thread_table();
 	void import_ifaddr_list();
 	void import_user_list();
+	void add_protodecoders();
 
 	void add_thread(const sinsp_threadinfo& ptinfo);
-	void remove_thread(int64_t tid);
+	void remove_thread(int64_t tid, bool force);
 
 	scap_t* m_h;
 	int64_t m_filesize;
 	bool m_islive;
+	string m_input_filename;
 	bool m_isdebug_enabled;
+	bool m_isfatfile_enabled;
 	bool m_compress;
 	sinsp_evt m_evt;
 	string m_lasterr;
@@ -584,6 +652,7 @@ private:
 #ifdef HAS_FILTERING
 	uint64_t m_firstevent_ts;
 	sinsp_filter* m_filter;
+	string m_filterstring;
 #endif
 
 	//
@@ -623,6 +692,7 @@ private:
 	// The cycle-writer for files
 	//
 	cycle_writer* m_cycle_writer;
+	bool m_write_cycling;
 
 	//
 	// Some dropping infrastructure
@@ -643,6 +713,11 @@ private:
 	FILE* m_profile_fp;
 #endif
 
+	//
+	// Protocol decoding state
+	//
+	vector<sinsp_protodecoder*> m_decoders_reset_list;
+
 	friend class sinsp_parser;
 	friend class sinsp_analyzer;
 	friend class sinsp_analyzer_parsers;
@@ -655,6 +730,8 @@ private:
 	friend class sinsp_chisel;
 	friend class sinsp_appevtparser;
 	friend class sinsp_filter_check_event;
+	friend class sinsp_protodecoder;
+	friend class lua_cbacks;
 
 	template<class TKey,class THash,class TCompare> friend class sinsp_connection_manager;
 };
@@ -669,6 +746,7 @@ class sinsp_profiler
 public:
 	sinsp_profiler(sinsp* inspector, const char* tags, uint32_t tags_size, const char* args = NULL, uint32_t args_size = 0)
 	{
+/*
 		m_id = inspector->profile_enter(tags, args);
 
 		if(m_id != -1)
@@ -680,14 +758,17 @@ public:
 		{
 			m_inspector = NULL;
 		}
+*/
 	}
 
 	~sinsp_profiler()
 	{
+/*
 		if(m_id != -1)
 		{
 			m_inspector->profile_exit(m_id, m_tags.c_str(), uint32_t tags_size);
 		}
+*/
 	}
 
 private:
