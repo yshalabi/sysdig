@@ -31,6 +31,8 @@ along with sysdig.  If not, see <http://www.gnu.org/licenses/>.
 #include <linux/fs_struct.h>
 #include <linux/uaccess.h>
 #include <linux/version.h>
+#include <linux/module.h>
+#include <asm/mman.h>
 
 #include "ppm_ringbuffer.h"
 #include "ppm_events_public.h"
