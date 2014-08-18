@@ -101,6 +101,7 @@ u16 pack_addr(struct sockaddr *usrsockaddr, int ulen, char *targetbuf, u16 targe
 u16 fd_to_socktuple(int fd, struct sockaddr *usrsockaddr, int ulen, bool use_userdata, bool is_inbound, char *targetbuf, u16 targetbufsize);
 int addr_to_kernel(void __user *uaddr, int ulen, struct sockaddr *kaddr);
 int32_t parse_readv_writev_bufs(struct event_filler_arguments *args, const struct iovec __user *iovsrc, unsigned long iovcnt, int64_t retval, int flags);
+int32_t get_snaplen(unsigned long fd);
 
 static inline int add_sentinel(struct event_filler_arguments *args)
 {

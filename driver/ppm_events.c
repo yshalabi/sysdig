@@ -915,6 +915,52 @@ int32_t parse_readv_writev_bufs(struct event_filler_arguments *args, const struc
 	return PPM_SUCCESS;
 }
 
+int32_t get_snaplen(unsigned long fd)
+{
+	unsigned int snaplen = g_snaplen;
+
+	{
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0)
+		struct fd f;
+
+		f = fdget(fd);
+
+		if (f.file && f.file->f_op) {
+			struct socket* sock = sock_from_file(file, &err);
+
+			if (sock) {
+				snaplen = g_net_snaplen;
+			}
+			else if (THIS_MODULE == f.file->f_op->owner)
+				snaplen = RW_SNAPLEN_EVENT;				
+			}
+
+			fdput(f);
+		}
+#else
+		struct file *file;
+
+		file = fget(fd);
+
+		if (file && file->f_op) {
+			int err;
+			struct socket* sock = sock_from_file(file, &err);
+
+			if (sock) {
+				snaplen = g_net_snaplen;
+			}
+			else if (THIS_MODULE == file->f_op->owner) {
+				snaplen = RW_SNAPLEN_EVENT;				
+			}
+
+			fput(file);
+		}
+#endif
+	}
+
+	return snaplen;
+}
+
 /*
  * STANDARD FILLERS
  */

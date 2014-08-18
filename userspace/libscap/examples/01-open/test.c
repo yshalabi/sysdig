@@ -33,6 +33,10 @@ int main(int argc, char** argv)
 		fprintf(stderr, "%s\n", error);
 		return -1;
 	}
+
+#if 0
+	scap_clear_eventmask(h);
+#endif
 	
 	while(1)
 	{

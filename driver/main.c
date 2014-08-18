@@ -139,6 +139,7 @@ static DEFINE_PER_CPU(struct ppm_ring_buffer_context*, g_ring_buffers);
 static DEFINE_MUTEX(g_open_mutex);
 static u32 g_open_count;
 u32 g_snaplen = RW_SNAPLEN;
+u32 g_net_snaplen = RW_SNAPLEN;
 u32 g_sampling_ratio = 1;
 static u32 g_sampling_interval;
 static int g_is_dropping;
@@ -216,6 +217,7 @@ static int ppm_open(struct inode *inode, struct file *filp)
 	 */
 	g_dropping_mode = 0;
 	g_snaplen = RW_SNAPLEN;
+	g_net_snaplen = RW_SNAPLEN;
 	g_sampling_ratio = 1;
 	g_sampling_interval = 0;
 	g_is_dropping = 0;
@@ -418,11 +420,28 @@ static long ppm_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		}
 
 		g_snaplen = new_snaplen;
+		g_net_snaplen = new_snaplen;
 
 		vpr_info("new snaplen: %d\n", g_snaplen);
 		return 0;
 	}
+	case PPM_IOCTL_SET_NET_SNAPLEN:
+	{
+		u32 new_snaplen;
 
+		vpr_info("PPM_IOCTL_SET_NET_SNAPLEN\n");
+		new_snaplen = (u32)arg;
+
+		if (new_snaplen > RW_MAX_SNAPLEN) {
+			pr_err("invalid snaplen %u\n", new_snaplen);
+			return -EINVAL;
+		}
+
+		g_net_snaplen = new_snaplen;
+
+		vpr_info("new snaplen: %d\n", g_net_snaplen);
+		return 0;
+	}
 	case PPM_IOCTL_MASK_ZERO_EVENTS:
 	{
 		vpr_info("PPM_IOCTL_MASK_ZERO_EVENTS\n");
@@ -434,7 +453,6 @@ static long ppm_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		set_bit(PPME_DROP_X, g_events_mask);
 		return 0;
 	}
-
 	case PPM_IOCTL_MASK_SET_EVENT:
 	{
 		u32 syscall_to_set = (u32)arg;
@@ -449,7 +467,6 @@ static long ppm_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		set_bit(syscall_to_set, g_events_mask);
 		return 0;
 	}
-
 	case PPM_IOCTL_MASK_UNSET_EVENT:
 	{
 		u32 syscall_to_unset = (u32)arg;

@@ -747,6 +747,16 @@ const scap_machine_info* scap_get_machine_info(scap_t* handle);
 int32_t scap_set_snaplen(scap_t* handle, uint32_t snaplen);
 
 /*!
+  \brief Set the capture snaplen for sockets.
+
+  \param handle Handle to the capture instance.
+  \param net_snaplen the socket snaplen for this capture instance, in bytes.
+
+  \note This function is equivalent to \ref scap_set_snaplen, but acts on sockets only.
+*/
+int32_t scap_set_net_snaplen(scap_t* handle, uint32_t net_snaplen);
+
+/*!
   \brief Clear the event mask: no events will be passed to sysdig
 
   \param handle Handle to the capture instance.

@@ -876,7 +876,7 @@ const scap_machine_info* scap_get_machine_info(scap_t* handle)
 	}
 }
 
-int32_t scap_set_snaplen(scap_t* handle, uint32_t snaplen)
+int32_t scap_set_snaplen_common(scap_t* handle, uint32_t snaplen, bool net_only)
 {
 	//
 	// Not supported on files
@@ -894,7 +894,9 @@ int32_t scap_set_snaplen(scap_t* handle, uint32_t snaplen)
 	//
 	// Tell the driver to change the snaplen
 	//
-	if(ioctl(handle->m_devs[0].m_fd, PPM_IOCTL_SET_SNAPLEN, snaplen))
+	int code = (net_only)? PPM_IOCTL_SET_NET_SNAPLEN : PPM_IOCTL_SET_SNAPLEN;
+
+	if(ioctl(handle->m_devs[0].m_fd, code, snaplen))
 	{
 		snprintf(handle->m_lasterr,	SCAP_LASTERR_SIZE, "scap_set_snaplen failed");
 		ASSERT(false);
@@ -921,6 +923,16 @@ int32_t scap_set_snaplen(scap_t* handle, uint32_t snaplen)
 
 	return SCAP_SUCCESS;
 #endif
+}
+
+int32_t scap_set_snaplen(scap_t* handle, uint32_t snaplen)
+{
+	return scap_set_snaplen_common(handle, snaplen, false);
+}
+
+int32_t scap_set_net_snaplen(scap_t* handle, uint32_t snaplen)
+{
+	return scap_set_snaplen_common(handle, snaplen, true);
 }
 
 int64_t scap_get_readfile_offset(scap_t* handle)
