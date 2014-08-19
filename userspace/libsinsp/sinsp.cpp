@@ -76,6 +76,7 @@ sinsp::sinsp() :
 	m_max_n_proc_lookups = 0;
 	m_max_n_proc_socket_lookups = 0;
 	m_snaplen = DEFAULT_SNAPLEN;
+	m_net_snaplen = DEFAULT_SNAPLEN;
 	m_buffer_format = sinsp_evt::PF_NORMAL;
 	m_isdebug_enabled = false;
 	m_isfatfile_enabled = false;
@@ -176,11 +177,16 @@ void sinsp::init()
 #endif
 
 	//
-	// If m_snaplen was modified, we set snaplen now
+	// If the snaplens were modified, we set them now
 	//
-	if (m_snaplen != DEFAULT_SNAPLEN)
+	if(m_snaplen != DEFAULT_SNAPLEN)
 	{
 		set_snaplen(m_snaplen);
+	}
+
+	if(m_net_snaplen != DEFAULT_SNAPLEN)
+	{
+		set_net_snaplen(m_snaplen);
 	}
 }
 
@@ -729,6 +735,31 @@ void sinsp::set_snaplen(uint32_t snaplen)
 	}
 
 	if(scap_set_snaplen(m_h, snaplen) != SCAP_SUCCESS)
+	{
+		//
+		// We know that setting the snaplen on a file doesn't do anything and
+		// we're ok with it.
+		//
+		if(m_islive)
+		{
+			throw sinsp_exception(scap_getlasterr(m_h));
+		}
+	}
+}
+
+void sinsp::set_net_snaplen(uint32_t net_snaplen)
+{
+	//
+	// If set_snaplen is called before opening of the inspector,
+	// we register the value to be set after its initialization.
+	//
+	if (m_h == NULL)
+	{
+		m_net_snaplen = net_snaplen;
+		return;
+	}
+
+	if(scap_set_net_snaplen(m_h, net_snaplen) != SCAP_SUCCESS)
 	{
 		//
 		// We know that setting the snaplen on a file doesn't do anything and

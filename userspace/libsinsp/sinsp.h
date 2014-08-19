@@ -258,6 +258,21 @@ public:
 	void set_snaplen(uint32_t snaplen);
 
 	/*!
+	  \brief Set the capture snaplen for sockets.
+
+	  \param handle Handle to the capture instance.
+	  \param net_snaplen the socket snaplen for this capture instance, 
+	   in bytes.
+
+	  \note This function is equivalent to \ref set_snaplen, but acts on 
+	   sockets only.
+
+	  @throws a sinsp_exception containing the error string is thrown in case
+	   of failure.
+	*/
+	void set_net_snaplen(uint32_t net_snaplen);
+
+	/*!
 	  \brief temporarily pauses event capture.
 
 	  \note This function can only be called for live captures.
@@ -608,6 +623,7 @@ private:
 	// Saved snaplen
 	//
 	uint32_t m_snaplen;
+	uint32_t m_net_snaplen;
 
 	//
 	// Some thread table limits
