@@ -523,7 +523,6 @@ static int f_sys_write_x(struct event_filler_arguments *args)
 	 * Based on the FD type, compute the snaplen
 	 */
 	syscall_get_arguments(current, args->regs, 0, 1, &val);
-
 	snaplen = get_snaplen((int)val);
 
 	/*

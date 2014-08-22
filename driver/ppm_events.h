@@ -25,6 +25,13 @@ along with sysdig.  If not, see <http://www.gnu.org/licenses/>.
 /*
  * Various crap that a callback might need
  */
+struct val_to_ring_args {
+	uint64_t val;
+	u16 val_len;
+	bool fromuser;
+	u8 dyn_idx;
+};
+
 struct event_filler_arguments {
 	char *buffer; /* the buffer that will be filled with the data */
 	u32 buffer_size; /* the space in the ring buffer available for this event */
@@ -45,6 +52,7 @@ struct event_filler_arguments {
 #ifdef __NR_socketcall
 	unsigned long socketcall_args[6];
 #endif
+	struct val_to_ring_args vr_args;
 };
 
 /*
@@ -95,7 +103,8 @@ extern const struct ppm_event_entry g_ppm_events[];
  * Functions
  */
 int32_t f_sys_autofill(struct event_filler_arguments *args, const struct ppm_event_entry *evinfo);
-int32_t val_to_ring(struct event_filler_arguments *args, uint64_t val, u16 val_len, bool fromuser, uint8_t dyn_idx);
+//int32_t val_to_ring(struct event_filler_arguments* args);
+int val_to_ring(struct event_filler_arguments *args, uint64_t val, u16 val_len, bool fromuser, u8 dyn_idx);
 char *npm_getcwd(char *buf, unsigned long bufsize);
 u16 pack_addr(struct sockaddr *usrsockaddr, int ulen, char *targetbuf, u16 targetbufsize);
 u16 fd_to_socktuple(int fd, struct sockaddr *usrsockaddr, int ulen, bool use_userdata, bool is_inbound, char *targetbuf, u16 targetbufsize);
