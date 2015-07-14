@@ -268,6 +268,7 @@ static int ppm_open(struct inode *inode, struct file *filp)
 	struct task_struct *consumer_id = current;
 	struct ppm_consumer_t *consumer = NULL;
 	struct ppm_ring_buffer_context *ring = NULL;
+	bool first_consumer = false;
 
 	/*
 	 * Tricky: to identify a consumer, attach the thread id
@@ -356,7 +357,9 @@ pr_err(">O %d\n", (int)g_open_count.counter);
 			if (!init_ring_buffer(ring)) {
 				pr_err("can't initialize the ring buffer for CPU %u\n", cpu);
 				ret = -ENOMEM;
-				goto err_init_ring_buffer;
+				check_remove_consumer(consumer, in_list);
+				mutex_unlock(&g_consumer_mutex);
+				goto end_open;
 			}
 
 			ring->cpu_online = true;
@@ -416,6 +419,19 @@ pr_err(">O %d\n", (int)g_open_count.counter);
 	ring->open = true;
 
 	if (!g_tracepoint_registered) {
+		first_consumer = true;
+		g_tracepoint_registered = true;
+	}
+
+	ret = 0;
+
+pr_err("<O %d\n", (int)g_open_count.counter);
+//	atomic_dec(&g_open_count);
+
+cleanup_open:
+	mutex_unlock(&g_consumer_mutex);
+
+	if (first_consumer) {
 		pr_info("starting capture\n");
 		/*
 		 * Enable the tracepoints
@@ -453,12 +469,9 @@ pr_err(">O %d\n", (int)g_open_count.counter);
 			goto err_signal_deliver;
 		}
 #endif
-		g_tracepoint_registered = true;
 	}
 
-	ret = 0;
-
-	goto cleanup_open;
+	goto end_open;
 
 #ifdef CAPTURE_SIGNAL_DELIVERIES
 err_signal_deliver:
@@ -472,13 +485,11 @@ err_sys_enter:
 	compat_unregister_trace(syscall_exit_probe, "sys_exit", tp_sys_exit);
 err_sys_exit:
 	ring->open = false;
-err_init_ring_buffer:
-	check_remove_consumer(consumer, in_list);
-cleanup_open:
-pr_err("<O %d\n", (int)g_open_count.counter);
-//	atomic_dec(&g_open_count);
 
+	mutex_lock(&g_consumer_mutex);
+	check_remove_consumer(consumer, in_list);
 	mutex_unlock(&g_consumer_mutex);
+end_open:
 
 	return ret;
 }
