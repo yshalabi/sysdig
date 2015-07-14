@@ -568,7 +568,6 @@ pr_err(">R2 %d\n", (int)g_open_count.counter);
 	ret = 0;
 
 cleanup_release:
-pr_err("<R %d\n", (int)g_open_count.counter);
 //	atomic_dec(&g_open_count);
 	mutex_unlock(&g_consumer_mutex);
 
@@ -597,6 +596,7 @@ pr_err(">RU7\n");
 pr_err(">RU8\n");
 	}
 
+pr_err("<R %d\n", (int)g_open_count.counter);
 	return ret;
 }
 
@@ -1922,9 +1922,10 @@ pr_err(">CD %d\n", (int)j);
 		rcu_read_unlock();
 	}
 
-pr_err("<C %d\n", (int)g_open_count.counter);
+pr_err(">CE %d\n", (int)g_open_count.counter);
 //	atomic_dec(&g_open_count);
 mutex_unlock(&g_consumer_mutex);
+pr_err("<C %d\n", (int)g_open_count.counter);
 	return NOTIFY_DONE;
 }
 
