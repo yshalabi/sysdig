@@ -490,6 +490,7 @@ static int ppm_release(struct inode *inode, struct file *filp)
 	int ring_no = iminor(filp->f_path.dentry->d_inode);
 	struct task_struct *consumer_id = filp->private_data;
 	struct ppm_consumer_t *consumer = NULL;
+	bool last_consumer = false;
 
 	mutex_lock(&g_consumer_mutex);
 
@@ -547,28 +548,7 @@ pr_err(">R2 %d\n", (int)g_open_count.counter);
 	 */
 	if (list_empty(&g_consumer_list)) {
 		if (g_tracepoint_registered) {
-			pr_info("no more consumers, stopping capture\n");
-
-pr_err(">RU1\n");
-			compat_unregister_trace(syscall_exit_probe, "sys_exit", tp_sys_exit);
-pr_err(">RU2\n");
-			compat_unregister_trace(syscall_enter_probe, "sys_enter", tp_sys_enter);
-pr_err(">RU3\n");
-			compat_unregister_trace(syscall_procexit_probe, "sched_process_exit", tp_sched_process_exit);
-pr_err(">RU4\n");
-
-#ifdef CAPTURE_CONTEXT_SWITCHES
-			compat_unregister_trace(sched_switch_probe, "sched_switch", tp_sched_switch);
-pr_err(">RU5\n");
-#endif
-#ifdef CAPTURE_SIGNAL_DELIVERIES
-			compat_unregister_trace(signal_deliver_probe, "signal_deliver", tp_signal_deliver);
-pr_err(">RU6\n");
-#endif
-			tracepoint_synchronize_unregister();
-pr_err(">RU7\n");
-			g_tracepoint_registered = false;
-pr_err(">RU8\n");
+			last_consumer = true;
 		} else {
 			ASSERT(false);
 		}
@@ -580,6 +560,31 @@ cleanup_release:
 pr_err("<R %d\n", (int)g_open_count.counter);
 //	atomic_dec(&g_open_count);
 	mutex_unlock(&g_consumer_mutex);
+
+	if (last_consumer) {
+		pr_info("no more consumers, stopping capture\n");
+
+pr_err(">RU1\n");
+		compat_unregister_trace(syscall_exit_probe, "sys_exit", tp_sys_exit);
+pr_err(">RU2\n");
+		compat_unregister_trace(syscall_enter_probe, "sys_enter", tp_sys_enter);
+pr_err(">RU3\n");
+		compat_unregister_trace(syscall_procexit_probe, "sched_process_exit", tp_sched_process_exit);
+pr_err(">RU4\n");
+
+	#ifdef CAPTURE_CONTEXT_SWITCHES
+		compat_unregister_trace(sched_switch_probe, "sched_switch", tp_sched_switch);
+pr_err(">RU5\n");
+	#endif
+	#ifdef CAPTURE_SIGNAL_DELIVERIES
+		compat_unregister_trace(signal_deliver_probe, "signal_deliver", tp_signal_deliver);
+pr_err(">RU6\n");
+	#endif
+		tracepoint_synchronize_unregister();
+pr_err(">RU7\n");
+		g_tracepoint_registered = false;
+pr_err(">RU8\n");
+	}
 
 	return ret;
 }
