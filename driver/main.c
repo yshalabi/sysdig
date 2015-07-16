@@ -1906,6 +1906,8 @@ pr_err(">CB %d\n", (int)g_open_count.counter);
 pr_err(">CBB %d\n", (int)g_open_count.counter);
 			ring = per_cpu_ptr(consumer->ring_buffers, cpu);
 			if (!ring->cpu_online) {
+				ring->capture_enabled = false;
+/*
 				pr_info("initializing ring buffer for CPU %lu, consumer %p\n", 
 					cpu,
 					consumer->consumer_id);
@@ -1916,6 +1918,7 @@ pr_err(">CC %d\n", (int)j);
 						cpu,
 						consumer->consumer_id);
 pr_err(">CD %d\n", (int)j);
+*/
 			}
 		}
 
