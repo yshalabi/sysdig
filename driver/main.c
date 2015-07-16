@@ -641,7 +641,8 @@ static long ppm_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			return -ENODEV;
 		}
 
-		ring->capture_enabled = true;
+		if (ring->cpu_online)
+			ring->capture_enabled = true;
 
 		vpr_info("PPM_IOCTL_ENABLE_CAPTURE for ring %d, consumer %p\n", ring_no, consumer_id);
 
@@ -1883,7 +1884,7 @@ static int cpu_callback(struct notifier_block *self, unsigned long action,
 	 * Make sure there are no opens running
 	 */
 pr_err(">C %d\n", (int)g_open_count.counter);
-mutex_lock(&g_consumer_mutex);
+//mutex_lock(&g_consumer_mutex);
 pr_err(">C1 %d\n", (int)g_open_count.counter);
 /*
 	while (unlikely(atomic_inc_return(&g_open_count) != 1)) {
@@ -1927,7 +1928,7 @@ pr_err(">CD %d\n", (int)j);
 
 pr_err(">CE %d\n", (int)g_open_count.counter);
 //	atomic_dec(&g_open_count);
-mutex_unlock(&g_consumer_mutex);
+//mutex_unlock(&g_consumer_mutex);
 pr_err("<C %d\n", (int)g_open_count.counter);
 	return NOTIFY_DONE;
 }
