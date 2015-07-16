@@ -764,7 +764,7 @@ int32_t sinsp::next(OUT sinsp_evt **puevt)
 
 #ifndef HAS_ANALYZER
 	//
-	// Deleayed removal of threads from the thread table, so that
+	// Delayed removal of threads from the thread table, so that
 	// things like exit() or close() can be parsed.
 	// We only do this if the analyzer is not enabled, because the analyzer
 	// needs the process at the end of the sample and will take care of deleting
